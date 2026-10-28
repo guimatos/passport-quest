@@ -8,9 +8,10 @@ import { createRandom, seedFromUrl } from './lib/random';
 import { Runner, type Entity } from './scene/runner';
 import { Fx } from './fx/fx';
 import { Hud } from './ui/hud';
-import { renderStart, renderRedeem, renderJournal, renderTravel, renderFinal, showCtaConfirm, clearScreen, type Counts } from './ui/screens';
+import { renderStart, renderRedeem, renderJournal, renderIntro, renderFinal, showCtaConfirm, clearScreen, type Counts } from './ui/screens';
+import { MAP_POINTS, MAP_W } from './art/map';
 
-export type GameState = 'start' | 'playing' | 'redeem' | 'journal' | 'travel' | 'final';
+export type GameState = 'start' | 'intro' | 'playing' | 'redeem' | 'journal' | 'final';
 
 const HINT_DELAY = 4000;
 const DISCOVER_LINES: Record<ItemId, string> = {
@@ -133,7 +134,7 @@ export class Game {
   private enterStart() {
     this.setState('start');
     this.app.style.setProperty('--scene-bg', '#201338');
-    renderStart(this.overlay, () => this.enterPlaying(0), this.ac.signal);
+    renderStart(this.overlay, () => this.enterIntro(0), this.ac.signal);
   }
 
   private enterPlaying(index: number) {
@@ -234,40 +235,57 @@ export class Game {
         this.setState('journal');
         renderJournal(this.overlay, dest, this.counts, isLast, () => {
           if (this.state !== 'journal') return;
-          if (isLast) this.enterFinal(); else this.enterTravel();
+          if (isLast) this.enterFinal(); else this.enterIntro(this.destIndex + 1);
         }, this.ac.signal);
       }, this.ac.signal);
     });
   }
 
-  private enterTravel() {
+  /**
+   * Level intro: the journey map with the plane flying to the destination,
+   * then a stage card (items, coupon, obstacles). Starts on tap or automatically.
+   */
+  private enterIntro(index: number) {
     this.allCountsStore = { ...this.allCountsStore, ...this.counts };
-    this.setState('travel');
-    const from = this.destination;
-    const to = DESTINATIONS[this.destIndex + 1];
+    this.destIndex = index;
     this.runner?.destroy();
     this.runner = null;
+    this.setState('intro');
     this.app.style.setProperty('--scene-bg', '#7845D8');
-    const parts = renderTravel(this.overlay, from, to);
+    const dest = this.destination;
+    if (!$('#hud').childElementCount) this.hud.mount(() => this.reset(), this.ac.signal);
+    this.hud.setDestination(dest, this.completedDests);
+    this.hud.setPoints(this.points);
 
-    // Quadratic arc in map coordinates (320x240 viewBox) matched to the dashed route.
-    const P0 = { x: 50, y: 190 }, P1 = { x: 160, y: 20 }, P2 = { x: 270, y: 90 };
-    const mapEl = $('.map-svg', this.overlay);
-    this.clock.tween(2200, (t) => {
+    const completed = this.completedDests.map((id) => DESTINATIONS.findIndex((d) => d.id === id));
+    const parts = renderIntro(this.overlay, dest, index, completed, () => this.startLevel(index), this.ac.signal);
+
+    // Plane flight along a quadratic curve in map coordinates.
+    const P2 = index === 0 ? MAP_POINTS.rio : MAP_POINTS.porto;
+    const P0 = index === 0 ? MAP_POINTS.entry : MAP_POINTS.rio;
+    const P1 = index === 0 ? MAP_POINTS.entryControl : MAP_POINTS.routeControl;
+    const duration = index === 0 ? 1500 : 2200;
+    this.clock.tween(duration, (t) => {
       const e = easeInOutCubic(t);
       const x = (1 - e) ** 2 * P0.x + 2 * (1 - e) * e * P1.x + e ** 2 * P2.x;
       const y = (1 - e) ** 2 * P0.y + 2 * (1 - e) * e * P1.y + e ** 2 * P2.y;
       const dx = 2 * (1 - e) * (P1.x - P0.x) + 2 * e * (P2.x - P1.x);
       const dy = 2 * (1 - e) * (P1.y - P0.y) + 2 * e * (P2.y - P1.y);
-      const s = mapEl.getBoundingClientRect().width / 320;
+      const s = parts.map.getBoundingClientRect().width / MAP_W;
       parts.plane.style.transform = `translate(${x * s}px, ${y * s}px) rotate(${Math.atan2(dy, dx) * 180 / Math.PI}deg)`;
     }, () => {
-      parts.status.textContent = 'Landed!';
-      parts.unlock.classList.add('show');
-      this.overlay.querySelector('.map-dest')?.classList.add('unlocked');
-      this.clock.tween(500, (t) => { parts.unlock.style.transform = `scale(${easeOutBack(t)})`; });
-      this.clock.after(1500, () => this.enterPlaying(this.destIndex + 1));
+      parts.plane.classList.add('landed');
+      parts.map.querySelector('.map-marker--active')?.classList.add('arrived');
+      parts.card.classList.add('show');
+      this.clock.tween(500, (t) => { parts.card.style.transform = `translateY(${(1 - easeOutBack(t)) * 60}px)`; parts.card.style.opacity = String(Math.min(1, t * 2)); });
+      // Auto-start after a short read time; the bar under the button shows the countdown.
+      this.clock.tween(4500, (t) => { parts.auto.style.width = `${t * 100}%`; }, () => this.startLevel(index));
     });
+  }
+
+  private startLevel(index: number) {
+    if (this.state !== 'intro') return; // tap + auto-start guard
+    this.enterPlaying(index);
   }
 
   private enterFinal() {

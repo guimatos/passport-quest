@@ -529,3 +529,51 @@ body {
 .reward-stamp { width: 64px; height: 64px; }
 .card .demo-note { font-size: 10px; }
 .journal { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); padding-bottom: 14px; }
+
+/* ---------- level intro (journey map + stage card) ---------- */
+#app[data-state="intro"] .hud-row2,
+#app[data-state="intro"] .hud-trip { display: none; }
+#app[data-state="intro"] .hud-place { visibility: hidden; }
+.screen--intro {
+  background: linear-gradient(180deg, #8a5be0, var(--purple) 55%, #4b2a9c);
+  justify-content: flex-start;
+  padding-top: calc(var(--hud-pad) + 56px);
+  gap: 8px;
+}
+.intro-eyebrow { font-size: 13px; }
+.screen--intro .map { width: min(100%, 300px); }
+.map-svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 8px 18px rgba(0,0,0,0.3)); }
+.map-marker-ring { fill: none; stroke: #FFF6E8; stroke-width: 2; opacity: 0; }
+.map-marker-dot { fill: #B9B2A6; stroke: #FFF6E8; stroke-width: 3; }
+.map-marker-n { font-family: var(--font); font-size: 11px; font-weight: 700; fill: var(--ink); }
+.map-label { font-family: var(--font); font-size: 11px; font-weight: 700; fill: var(--cream); paint-order: stroke; stroke: rgba(32,19,56,0.6); stroke-width: 3px; }
+.map-marker--active .map-marker-dot { fill: var(--orange); }
+.map-marker--done .map-marker-dot { fill: #1FA463; }
+.map-marker--active.arrived .map-marker-ring { opacity: 1; animation: marker-ping 1.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes marker-ping { from { transform: scale(0.6); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+.travel-plane.landed { animation: plane-land 0.4s ease forwards; }
+@keyframes plane-land { to { transform: translate(var(--tx, 0), var(--ty, 0)) scale(0.6); opacity: 0; } }
+.intro-card {
+  padding: 12px 14px 12px; gap: 4px; width: min(100%, 300px);
+  opacity: 0; transform: translateY(60px);
+  animation: none;
+}
+.intro-card h2 { font-size: 24px; line-height: 1; display: flex; flex-direction: column; align-items: center; }
+.intro-card h2 span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--purple); margin-top: 3px; }
+.intro-tagline { font-size: 13px; opacity: 0.8; margin-bottom: 4px; }
+.intro-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; }
+.intro-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--purple); width: 46px; text-align: left; flex: none; }
+.intro-icons { display: flex; gap: 4px; }
+.intro-icons svg { width: 28px; height: 28px; background: #F3E9FF; border-radius: 8px; padding: 2px; }
+.intro-icons--avoid svg { background: #FFE7E2; }
+.intro-coupon { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; text-align: left; line-height: 1.15; }
+.intro-coupon .coupon-icon { width: 24px; height: 18px; }
+.btn--start { margin-top: 8px; position: relative; overflow: hidden; min-width: 200px; }
+.btn-auto { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: rgba(255,246,232,0.6); border-radius: 2px; }
+@media (max-height: 600px) {
+  .screen--intro { gap: 4px; }
+  .screen--intro .map { width: min(100%, 240px); }
+  .intro-card { padding: 10px 12px; }
+  .intro-card h2 { font-size: 20px; }
+  .intro-tagline { display: none; }
+}

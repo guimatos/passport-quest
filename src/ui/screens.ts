@@ -2,11 +2,12 @@ import type { DestinationDef, ItemId } from '../data/destinations';
 import { DESTINATIONS, COMPLETION_BONUS, COUPON_BONUS } from '../data/destinations';
 import { foxSvg } from '../art/fox';
 import { stampSvg, PLANE_SVG } from '../art/passport';
-import { ITEM_ART, TICKET_SVG } from '../art/items';
+import { ITEM_ART, OBSTACLE_ART, TICKET_SVG } from '../art/items';
+import { mapSvg } from '../art/map';
 import { $ } from '../lib/dom';
 
 /**
- * Full-screen overlay screens: start, redeem, journal, travel, final.
+ * Full-screen overlay screens: start, intro, redeem, journal, final.
  * Each render replaces the overlay content; listeners use the game's signal.
  */
 const FRAMING = 'With Scrambly, every game you discover and play adds up. Try it with this trip.';
@@ -99,28 +100,37 @@ export function renderJournal(root: HTMLElement, dest: DestinationDef, counts: C
   $('.btn--continue', root).addEventListener('click', onContinue, { signal });
 }
 
-export interface TravelParts { plane: HTMLElement; status: HTMLElement; unlock: HTMLElement }
+export interface IntroParts { plane: HTMLElement; card: HTMLElement; map: SVGSVGElement; auto: HTMLElement }
 
-export function renderTravel(root: HTMLElement, from: DestinationDef, to: DestinationDef): TravelParts {
+export function renderIntro(root: HTMLElement, dest: DestinationDef, index: number, completed: number[], onStart: () => void, signal: AbortSignal): IntroParts {
+  const couponItem = dest.items.find((i) => i.id === dest.coupon.itemId)!;
   root.innerHTML = `
-    <section class="screen screen--travel">
+    <section class="screen screen--intro">
+      <p class="eyebrow intro-eyebrow">Destination ${index + 1} of ${DESTINATIONS.length}</p>
       <div class="map">
-        <svg class="map-svg" viewBox="0 0 320 240" aria-hidden="true">
-          <path class="map-route" d="M50 190 Q160 20 270 90" fill="none" stroke="#FFF6E8" stroke-width="3" stroke-dasharray="6 8" opacity="0.6"/>
-          <circle cx="50" cy="190" r="10" fill="#1FA463" stroke="#FFF6E8" stroke-width="3"/>
-          <circle class="map-dest" cx="270" cy="90" r="10" fill="#2E6FD8" stroke="#FFF6E8" stroke-width="3"/>
-          <text x="50" y="222" text-anchor="middle" fill="#FFF6E8" font-size="14" font-weight="600">${from.country}</text>
-          <text x="270" y="64" text-anchor="middle" fill="#FFF6E8" font-size="14" font-weight="600">${to.country}</text>
-        </svg>
+        ${mapSvg(index, completed)}
         <div class="travel-plane">${PLANE_SVG}</div>
       </div>
-      <p class="travel-status">Flying to ${to.name}…</p>
-      <div class="travel-unlock">
-        <strong>${to.name} unlocked!</strong>
-        <span>${to.tagline}</span>
+      <div class="card intro-card">
+        <h2>${dest.name}<span>${dest.country}</span></h2>
+        <p class="intro-tagline">${dest.tagline}</p>
+        <div class="intro-row">
+          <span class="intro-label">Catch</span>
+          <div class="intro-icons">${dest.items.map((it) => `<svg viewBox="-28 -28 56 56" title="${it.label}">${ITEM_ART[it.id]()}</svg>`).join('')}</div>
+        </div>
+        <div class="intro-row">
+          <span class="intro-label">Coupon</span>
+          <div class="intro-coupon"><span class="coupon-icon">${TICKET_SVG}</span><span>${dest.coupon.need} × ${couponItem.label.toLowerCase()} → ${dest.coupon.title.toLowerCase()}</span></div>
+        </div>
+        <div class="intro-row">
+          <span class="intro-label">Avoid</span>
+          <div class="intro-icons intro-icons--avoid">${dest.obstacles.map((o) => `<svg viewBox="-28 -28 56 56" title="${o.label}">${OBSTACLE_ART[o.id]}</svg>`).join('')}</div>
+        </div>
+        <button class="btn btn--primary btn--start" type="button">Let's run!<span class="btn-auto"></span></button>
       </div>
     </section>`;
-  return { plane: $('.travel-plane', root), status: $('.travel-status', root), unlock: $('.travel-unlock', root) };
+  $('.btn--start', root).addEventListener('click', onStart, { signal });
+  return { plane: $('.travel-plane', root), card: $('.intro-card', root), map: $('.map-svg', root), auto: $('.btn-auto', root) };
 }
 
 export function renderFinal(root: HTMLElement, points: number, counts: Counts, coupons: string[], onCta: () => void, onRestart: () => void, signal: AbortSignal) {

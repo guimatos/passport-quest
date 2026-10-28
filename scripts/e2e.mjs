@@ -57,7 +57,13 @@ await shot('01-start');
 check((await state()) === 'start', 'starts on start screen');
 await page.tap('.btn--play');
 await sleep(200);
-check((await state()) === 'playing', 'play enters playing');
+check((await state()) === 'intro', 'play enters the level intro');
+await sleep(1800); await shot('01b-intro');
+check(await page.$eval('.intro-card', (e) => e.classList.contains('show')), 'intro card shown after the plane lands');
+await page.tap('.btn--start');
+await page.tap('.btn--start').catch(() => {});
+await sleep(200);
+check((await state()) === 'playing', 'start button enters playing (double tap ignored)');
 await shot('02-brazil');
 
 // Real pointer: fox follows the mouse Y
@@ -99,10 +105,11 @@ await shot('04b-journal');
 check((await page.$$('.journal-row')).length === 5, 'journal lists 5 items');
 await page.tap('.btn--continue');
 await sleep(200);
-check((await state()) === 'travel', 'journal continue enters travel');
-await sleep(1200); await shot('05-travel');
-await sleep(2800);
-check((await state()) === 'playing', 'travel auto-enters Portugal');
+check((await state()) === 'intro', 'journal continue enters the Porto intro');
+await sleep(2600); await shot('05-intro-porto');
+check(await page.$$eval('.map-marker--done', (els) => els.length) === 1, 'map shows Rio as done');
+await sleep(5000);
+check((await state()) === 'playing', 'intro auto-starts Portugal');
 check(await page.$eval('.hud-place-name', (e) => e.textContent) === 'Porto', 'HUD shows Porto');
 await shot('06-porto');
 const t1 = Date.now();
@@ -126,15 +133,17 @@ await page.tap('.btn--restart-final');
 await sleep(200);
 check((await state()) === 'start', 'restart from final -> start');
 
-// Repeated restarts from various states, including mid-redeem and mid-travel
+// Repeated restarts from various states, including mid-intro, mid-redeem and mid-journal
 for (let i = 0; i < 12; i++) {
   await page.tap('.btn--play'); await sleep(80);
+  if (i % 4 === 3) { check((await state()) === 'intro', `iteration ${i}: restart from intro`); await page.tap('.btn--restart'); await sleep(60); check((await state()) === 'start', `restart iteration ${i} -> start`); continue; }
+  await sleep(1700); await page.tap('.btn--start'); await sleep(80);
   if (i % 3 === 1) {
     await autopilot(90000, 'item'); await sleep(1200);
     await page.tap('.btn--continue'); await sleep(300);
     if (i % 2 === 0) {
       await page.tap('.btn--continue'); await sleep(300);
-      check((await state()) === 'travel', `iteration ${i}: in travel`);
+      check((await state()) === 'intro', `iteration ${i}: in intro`);
     } else {
       check((await state()) === 'journal', `iteration ${i}: in journal`);
     }
@@ -146,8 +155,8 @@ for (let i = 0; i < 12; i++) {
   check(await page.$eval('#fx', (e) => e.childElementCount) === 0, `iteration ${i}: fx cleared`);
   check(await page.$eval('#scene-root', (e) => e.childElementCount) === 0, `iteration ${i}: scene cleared`);
 }
-await page.tap('.btn--play'); await sleep(100);
-check((await dbg()).points === 0, 'points reset after restarts');
+await page.tap('.btn--play'); await sleep(1700); await page.tap('.btn--start'); await sleep(100);
+check((await state()) === 'playing' && (await dbg()).points === 0, 'points reset after restarts');
 
 // Visibility pause: hint timer and world should not advance while hidden
 await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
