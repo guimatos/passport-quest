@@ -3,8 +3,9 @@ import { ITEM_ART } from './art/items';
 import { SCENE_ART } from './art/scenes';
 import { Clock, easeInOutCubic, easeOutBack } from './lib/clock';
 import { Loop } from './lib/loop';
-import { $, centerOf } from './lib/dom';
-import { buildScene, type Scene } from './scene/scene';
+import { $ } from './lib/dom';
+import { createRandom, seedFromUrl } from './lib/random';
+import { Runner, type Entity } from './scene/runner';
 import { Fx } from './fx/fx';
 import { Hud } from './ui/hud';
 import { renderStart, renderRedeem, renderTravel, renderFinal, showCtaConfirm, clearScreen } from './ui/screens';
@@ -12,13 +13,13 @@ import { renderStart, renderRedeem, renderTravel, renderFinal, showCtaConfirm, c
 export type GameState = 'start' | 'playing' | 'redeem' | 'travel' | 'final';
 
 const HINT_DELAY = 4000;
-const FOX_LINES: Record<ItemId, string> = {
-  coconut: 'A coconut! Refreshing find.',
-  football: 'Goooal! Nice spot.',
-  seashell: 'A seashell. You have sharp eyes!',
-  azulejo: 'An azulejo tile. Beautiful!',
+const DISCOVER_LINES: Record<ItemId, string> = {
+  coconut: 'A coconut! Refreshing.',
+  football: 'Goooal! A football.',
+  seashell: 'A seashell! Pretty.',
+  azulejo: 'An azulejo tile!',
   tram: 'A tiny tram. Ding ding!',
-  nata: 'Pastel de nata. Delicious!',
+  nata: 'Pastel de nata. Yum!',
 };
 
 /**
@@ -30,27 +31,29 @@ export class Game {
   state: GameState = 'start';
   private destIndex = 0;
   private points = 0;
-  private collected = new Set<ItemId>();
+  private progress = 0;
+  private discovered = new Set<ItemId>();
   private completedDests: string[] = [];
-  private completing = false;
+  private speedToastShown = false;
 
   private ac = new AbortController();
   private clock = new Clock();
   private loop: Loop;
   private fx: Fx;
   private hud: Hud;
-  private scene: Scene | null = null;
+  private runner: Runner | null = null;
+  private random = createRandom(1);
   private hintTimer: number | undefined;
   private bubbleTimer: number | undefined;
-  private lastPointer: { x: number; y: number } | null = null;
 
   private readonly app = $('#app');
+  private readonly stage = $('#stage');
   private readonly sceneRoot = $('#scene-root');
   private readonly overlay = $('#overlay');
   private readonly rotate = $('#rotate');
 
   constructor() {
-    this.loop = new Loop((dt) => this.clock.tick(dt), (paused) => this.app.classList.toggle('paused', paused));
+    this.loop = new Loop((dt) => this.frame(dt), (paused) => this.app.classList.toggle('paused', paused));
     this.fx = new Fx($('#fx'), this.clock);
     this.hud = new Hud($('#hud'));
   }
@@ -70,8 +73,8 @@ export class Game {
     this.clock.clearAll();
     this.hintTimer = this.bubbleTimer = undefined;
     this.fx.clear();
-    this.scene?.destroy();
-    this.scene = null;
+    this.runner?.destroy();
+    this.runner = null;
     this.hud.unmount();
     clearScreen(this.overlay);
     this.app.classList.remove('paused');
@@ -79,30 +82,38 @@ export class Game {
     this.state = 'start';
     this.destIndex = 0;
     this.points = 0;
-    this.collected = new Set();
+    this.progress = 0;
+    this.discovered = new Set();
     this.completedDests = [];
-    this.completing = false;
-    this.lastPointer = null;
+    this.speedToastShown = false;
   }
 
   private init() {
     this.ac = new AbortController();
     const { signal } = this.ac;
+    this.random = createRandom(seedFromUrl());
 
     document.addEventListener('visibilitychange', () => {
       this.loop.setPaused('hidden', document.visibilityState === 'hidden');
     }, { signal });
-    window.addEventListener('blur', () => { /* keep running on blur; only hidden pauses */ }, { signal });
     window.addEventListener('resize', () => this.checkOrientation(), { signal });
     window.addEventListener('orientationchange', () => this.checkOrientation(), { signal });
-    this.app.addEventListener('pointerdown', (ev) => { this.lastPointer = { x: ev.clientX, y: ev.clientY }; }, { signal, passive: true });
-    // Pointer leaving / cancelled: nothing is "held", but clear the tracking point.
-    this.app.addEventListener('pointercancel', () => { this.lastPointer = null; }, { signal });
 
     this.loop.setPaused('hidden', document.visibilityState === 'hidden');
     this.checkOrientation();
     this.loop.start();
     this.enterStart();
+  }
+
+  private frame(dt: number) {
+    this.clock.tick(dt);
+    if (this.runner && (this.state === 'playing' || this.state === 'redeem')) {
+      this.runner.update(dt);
+      if (this.state === 'playing' && !this.speedToastShown && this.runner.progressRamp > 0.45) {
+        this.speedToastShown = true;
+        this.hud.toast('Faster!', 'toast--speed');
+      }
+    }
   }
 
   // ---------- states ----------
@@ -120,49 +131,58 @@ export class Game {
 
   private enterPlaying(index: number) {
     this.destIndex = index;
-    this.collected = new Set();
-    this.completing = false;
-    this.scene?.destroy();
+    this.progress = 0;
+    this.discovered = new Set();
+    this.speedToastShown = false;
+    this.runner?.destroy();
     clearScreen(this.overlay);
     this.setState('playing');
 
     const dest = this.destination;
     this.app.style.setProperty('--scene-bg', SCENE_ART[dest.id].bg);
-    this.scene = buildScene(dest, {
-      onItem: (id, el, ev) => this.collect(id, el, ev),
-      onDecoy: (_id, el) => this.shakeDecoy(el),
-    }, this.ac.signal);
-    this.sceneRoot.appendChild(this.scene.el);
+    this.runner = new Runner(dest, {
+      onCollect: (e, screen) => this.collect(e, screen),
+      onHit: (e, screen) => this.hit(e, screen),
+    }, this.random, this.ac.signal, this.stage);
+    this.sceneRoot.appendChild(this.runner.el);
 
     if (!$('#hud').childElementCount) this.hud.mount(() => this.reset(), this.ac.signal);
     this.hud.setDestination(dest, this.completedDests);
     this.hud.setPoints(this.points);
-    this.say(index === 0 ? `Welcome to ${dest.name}! Find 3 hidden items.` : `Welcome to ${dest.name}! 3 more to find.`, 2600);
+    this.say(index === 0 ? 'Move up and down to catch items!' : `${dest.name}! Faster this time.`, 2800);
     this.armHint();
   }
 
-  private collect(id: ItemId, el: SVGGElement, ev: PointerEvent) {
-    if (this.state !== 'playing' || this.collected.has(id) || this.completing) return;
-    this.collected.add(id);
-    this.scene!.markCollected(id);
-    this.clock.cancel(this.hintTimer);
+  private collect(e: Entity, screen: { x: number; y: number }) {
+    if (this.state !== 'playing') return;
+    const id = e.id as ItemId;
+    const dest = this.destination;
+    const first = !this.discovered.has(id);
+    this.discovered.add(id);
+    this.progress = Math.min(dest.level.goal, this.progress + 1);
+    this.armHint();
 
-    const from = centerOf(el.getBoundingClientRect());
-    const to = this.hud.objectivePoint(id);
-    this.fx.burst(ev.clientX, ev.clientY, this.destination.accent);
-    this.fx.floatText(from.x, from.y - 10, `+${POINTS_PER_ITEM}`);
-    this.fx.fly(from, to, ITEM_ART[id](), () => {
-      this.hud.markCollected(id, this.collected.size);
+    this.fx.burst(screen.x, screen.y, dest.accent, 8);
+    this.fx.floatText(screen.x, screen.y - 14, `+${POINTS_PER_ITEM}`);
+    const to = first ? this.hud.objectivePoint(id) : this.hud.barPoint();
+    this.fx.fly(screen, to, ITEM_ART[id](), () => {
+      if (first) this.hud.markDiscovered(id);
+      this.hud.setProgress(this.progress, dest.level.goal, 'up');
       this.addPoints(POINTS_PER_ITEM);
     });
-    this.say(FOX_LINES[id], 1800);
+    if (first) this.say(DISCOVER_LINES[id], 1600);
 
-    if (this.collected.size >= this.destination.items.length) {
-      this.completing = true; // blocks any further input immediately
-      this.clock.after(900, () => this.completeDestination());
-    } else {
-      this.armHint();
-    }
+    if (this.progress >= dest.level.goal) this.completeDestination();
+  }
+
+  private hit(_e: Entity, screen: { x: number; y: number }) {
+    if (this.state !== 'playing') return;
+    const dest = this.destination;
+    this.progress = Math.max(0, this.progress - dest.level.penalty);
+    this.hud.setProgress(this.progress, dest.level.goal, 'down');
+    this.fx.floatText(screen.x, screen.y - 14, 'Ouch!', 'float-text--bad');
+    this.fx.burst(screen.x, screen.y, '#201338', 6);
+    this.say('Ouch! Watch out.', 1000);
   }
 
   private addPoints(n: number) {
@@ -170,26 +190,21 @@ export class Game {
     this.hud.setPoints(this.points, true);
   }
 
-  private shakeDecoy(el: SVGGElement) {
-    if (this.state !== 'playing') return;
-    el.classList.remove('shake');
-    void (el as unknown as HTMLElement).getBoundingClientRect();
-    el.classList.add('shake');
-    this.say('Not this one!', 1200, 'think');
-  }
-
   private completeDestination() {
-    if (this.state !== 'playing') return;
+    if (this.state !== 'playing') return; // double-completion guard
     this.setState('redeem');
+    this.clock.cancel(this.hintTimer);
     const dest = this.destination;
     this.completedDests.push(dest.id);
-    this.addPoints(COMPLETION_BONUS);
+    this.runner?.finish();
+    this.runner?.say(`${dest.shortName} complete!`);
     this.fx.confetti();
     this.hud.setDestination(dest, this.completedDests);
-    dest.items.forEach((it) => this.hud.markCollected(it.id, dest.items.length));
-    this.say(`${dest.name} complete! Reward time.`, 2500, 'cheer');
+    dest.items.forEach((it) => this.hud.markDiscovered(it.id));
+    this.hud.setProgress(dest.level.goal, dest.level.goal);
     const isLast = this.destIndex === DESTINATIONS.length - 1;
-    this.clock.after(500, () => {
+    this.clock.after(900, () => {
+      this.addPoints(COMPLETION_BONUS);
       renderRedeem(this.overlay, dest, this.points, isLast, () => {
         if (this.state !== 'redeem') return; // double-tap guard
         if (isLast) this.enterFinal(); else this.enterTravel();
@@ -201,8 +216,8 @@ export class Game {
     this.setState('travel');
     const from = this.destination;
     const to = DESTINATIONS[this.destIndex + 1];
-    this.scene?.destroy();
-    this.scene = null;
+    this.runner?.destroy();
+    this.runner = null;
     this.app.style.setProperty('--scene-bg', '#7845D8');
     const parts = renderTravel(this.overlay, from, to);
 
@@ -215,8 +230,7 @@ export class Game {
       const y = (1 - e) ** 2 * P0.y + 2 * (1 - e) * e * P1.y + e ** 2 * P2.y;
       const dx = 2 * (1 - e) * (P1.x - P0.x) + 2 * e * (P2.x - P1.x);
       const dy = 2 * (1 - e) * (P1.y - P0.y) + 2 * e * (P2.y - P1.y);
-      const r = mapEl.getBoundingClientRect();
-      const s = r.width / 320;
+      const s = mapEl.getBoundingClientRect().width / 320;
       parts.plane.style.transform = `translate(${x * s}px, ${y * s}px) rotate(${Math.atan2(dy, dx) * 180 / Math.PI}deg)`;
     }, () => {
       parts.status.textContent = 'Landed!';
@@ -229,8 +243,8 @@ export class Game {
 
   private enterFinal() {
     this.setState('final');
-    this.scene?.destroy();
-    this.scene = null;
+    this.runner?.destroy();
+    this.runner = null;
     this.hud.unmount();
     this.app.style.setProperty('--scene-bg', '#201338');
     renderFinal(this.overlay, this.points, () => this.onCta(), () => this.reset(), this.ac.signal);
@@ -244,32 +258,21 @@ export class Game {
 
   // ---------- helpers ----------
 
-  private say(text: string, ms: number, mood: 'happy' | 'cheer' | 'think' = 'happy') {
-    if (this.state === 'start' || this.state === 'final') return;
+  private say(text: string, ms: number) {
+    if (!this.runner || this.state !== 'playing') return;
     this.clock.cancel(this.bubbleTimer);
-    this.hud.say(text, mood);
-    this.bubbleTimer = this.clock.after(ms, () => this.hud.hush());
+    this.runner.say(text);
+    this.bubbleTimer = this.clock.after(ms, () => this.runner?.say(null));
   }
 
-  /** After HINT_DELAY without a collection, wiggle the nearest uncollected item. */
+  /** After HINT_DELAY without a collection, show the move-up-and-down nudge. */
   private armHint() {
     this.clock.cancel(this.hintTimer);
-    this.scene?.setHint(null);
+    this.runner?.setHint(false);
     this.hintTimer = this.clock.after(HINT_DELAY, () => {
-      if (this.state !== 'playing' || !this.scene) return;
-      const remaining = this.destination.items.filter((it) => !this.collected.has(it.id));
-      if (!remaining.length) return;
-      let target = remaining[0];
-      if (this.lastPointer) {
-        const r = this.scene.el.getBoundingClientRect();
-        // Convert last pointer to scene units (slice: uniform scale, centered).
-        const s = Math.max(r.width / 360, r.height / 720);
-        const px = (this.lastPointer.x - r.left - (r.width - 360 * s) / 2) / s;
-        const py = (this.lastPointer.y - r.top - (r.height - 720 * s) / 2) / s;
-        target = remaining.reduce((a, b) => (Math.hypot(a.x - px, a.y - py) <= Math.hypot(b.x - px, b.y - py) ? a : b));
-      }
-      this.scene.setHint(target.id);
-      this.say('Psst… look closer!', 1600, 'think');
+      if (this.state !== 'playing' || !this.runner) return;
+      this.runner.setHint(true);
+      this.say('Move up and down to catch items!', 2000);
     });
   }
 
@@ -279,5 +282,17 @@ export class Game {
     const block = landscape && tooShort;
     this.rotate.hidden = !block;
     this.loop.setPaused('rotate', block);
+  }
+
+  /** Test/debug hooks (used by scripts/e2e.mjs). */
+  get debug() {
+    return {
+      state: this.state,
+      points: this.points,
+      progress: this.progress,
+      entities: this.runner?.liveEntities() ?? [],
+      fox: this.runner?.foxPosition ?? null,
+      toScreen: (x: number, y: number) => this.runner?.toScreen(x, y) ?? null,
+    };
   }
 }

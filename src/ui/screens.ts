@@ -1,5 +1,5 @@
 import type { DestinationDef } from '../data/destinations';
-import { DESTINATIONS, MAX_POINTS } from '../data/destinations';
+import { DESTINATIONS } from '../data/destinations';
 import { foxSvg } from '../art/fox';
 import { stampSvg, PLANE_SVG } from '../art/passport';
 import { ITEM_ART } from '../art/items';
@@ -23,11 +23,11 @@ export function renderStart(root: HTMLElement, onPlay: () => void, signal: Abort
       <h1 class="title">Passport<span>Quest</span></h1>
       <p class="hook">Travel from Brazil to Portugal with the Scrambly fox and fill your passport.</p>
       <ol class="loop-strip" aria-label="How it works">
-        <li><b>1</b><span>Discover</span><small>find hidden items</small></li>
+        <li><b>1</b><span>Discover</span><small>catch local items</small></li>
         <li><b>2</b><span>Play</span><small>earn demo points</small></li>
         <li><b>3</b><span>Redeem</span><small>collect stamps</small></li>
       </ol>
-      <p class="instruction">Find <b>3 hidden items</b> in each destination.</p>
+      <p class="instruction">Move <b>up and down</b> to catch items and dodge obstacles.</p>
       <button class="btn btn--primary btn--play" type="button">Play</button>
       <p class="framing">${FRAMING}</p>
       <p class="demo-note">${DEMO_NOTE}</p>
@@ -97,7 +97,7 @@ export function renderFinal(root: HTMLElement, points: number, onCta: () => void
       </div>
       <div class="final-wallet">
         <span class="wallet-coin" aria-hidden="true"></span>
-        <strong>${points}</strong> <span>of ${MAX_POINTS} demo points</span>
+        <strong>${points}</strong> <span>demo points earned</span>
       </div>
       <p class="demo-note">${DEMO_NOTE}</p>
       <p class="final-message">You discovered, played and redeemed. That's the Scrambly loop: discover games, play and progress, then redeem rewards.</p>

@@ -31,8 +31,10 @@ export const ITEM_ART: Record<ItemId, ItemArt> = {
     : `<ellipse rx="20" ry="14" fill="#E8C077" stroke="#B27B2E" stroke-width="2"/><ellipse rx="13" ry="8" fill="#F6D98A"/><ellipse cx="-3" cy="-2" rx="4" ry="2" fill="#8C4F1D"/>`,
 };
 
-/** Decoy (non-collectible) art keyed by decoy id. Placeholder shapes in Phase 2. */
-export const DECOY_ART: Record<string, string> = {
+/** Obstacle art keyed by obstacle id, centered on (0,0). Placeholder shapes in Phase 2. */
+export const OBSTACLE_ART: Record<string, string> = {
+  cactus: `<rect x="-8" y="-26" width="16" height="46" rx="8" fill="#3F8F4A"/><rect x="-22" y="-12" width="12" height="20" rx="6" fill="#3F8F4A"/>`,
+  bollard: `<rect x="-7" y="-24" width="14" height="44" rx="5" fill="#2F3B46"/><circle cy="-24" r="8" fill="#2F3B46"/>`,
   crab: `<ellipse rx="16" ry="10" fill="#E0533B"/><circle cx="-6" cy="-10" r="3" fill="#201338"/><circle cx="6" cy="-10" r="3" fill="#201338"/>`,
   gull: `<ellipse rx="14" ry="8" fill="#FFF6E8" stroke="#201338" stroke-width="1.5"/><polygon points="14,0 22,-2 14,3" fill="#F58324"/>`,
 };

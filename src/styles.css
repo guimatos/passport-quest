@@ -161,7 +161,6 @@ body {
   color: var(--cream);
   backdrop-filter: blur(4px);
 }
-.hud-objectives-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; }
 .objectives { display: flex; gap: 6px; }
 .objective {
   position: relative;
@@ -183,39 +182,7 @@ body {
   transform: scale(0); transition: transform 0.25s cubic-bezier(.34,1.56,.64,1);
 }
 .objective.found .objective-check { transform: scale(1); }
-.hud-progress { font-size: 13px; font-weight: 700; opacity: 0.9; }
 
-.hud-fox {
-  position: absolute;
-  left: 8px;
-  bottom: max(10px, env(safe-area-inset-bottom));
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  max-width: calc(100% - 16px);
-}
-.hud-fox-avatar { width: 64px; height: 64px; flex: none; }
-.hud-fox-avatar svg { width: 100%; height: 100%; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.3)); }
-.hud-fox-avatar.bounce { animation: fox-bounce 0.5s cubic-bezier(.34,1.56,.64,1); }
-@keyframes fox-bounce { 30% { transform: translateY(-10px) scale(1.08); } 100% { transform: none; } }
-.hud-bubble {
-  order: 2;
-  background: var(--cream);
-  color: var(--ink);
-  font-weight: 600;
-  font-size: 14px;
-  line-height: 1.2;
-  padding: 8px 12px;
-  border-radius: 14px 14px 14px 4px;
-  margin-bottom: 14px;
-  max-width: 210px;
-  opacity: 0;
-  transform: translateY(6px) scale(0.9);
-  transform-origin: left bottom;
-  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(.34,1.56,.64,1);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-}
-.hud-bubble.show { opacity: 1; transform: none; }
 
 .hud-trip {
   position: absolute;
@@ -228,30 +195,6 @@ body {
 .trip-dot--active { background: var(--orange); box-shadow: 0 0 0 3px rgba(245,131,36,0.35); }
 .trip-dot--done { background: #1FA463; }
 .trip-line { width: 14px; height: 2px; background: rgba(255,246,232,0.3); }
-
-/* ---------- scene items ---------- */
-.item { cursor: pointer; }
-.item .hit { pointer-events: all; }
-.item.collected { pointer-events: none; }
-.item.collected .item-wiggle { animation: item-pop 0.3s ease forwards; }
-@keyframes item-pop { 40% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(0); opacity: 0; } }
-.item.hint .item-wiggle { animation: item-hint 1.1s ease-in-out infinite; }
-.item.hint .item-art { filter: drop-shadow(0 0 6px #FFF6E8) drop-shadow(0 0 10px var(--orange)); }
-@keyframes item-hint {
-  0%, 100% { transform: rotate(0) scale(1); }
-  20% { transform: rotate(-9deg) scale(1.12); }
-  40% { transform: rotate(8deg) scale(1.12); }
-  60% { transform: rotate(-5deg) scale(1.08); }
-  80% { transform: rotate(4deg) scale(1.04); }
-}
-.decoy { cursor: pointer; }
-.decoy.shake .decoy-art { animation: decoy-shake 0.4s ease; }
-@keyframes decoy-shake {
-  20% { transform: translateX(-5px) rotate(-6deg); }
-  40% { transform: translateX(5px) rotate(6deg); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(3px); }
-}
 
 /* ---------- fx ---------- */
 .spark { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 2px; will-change: transform; }
@@ -408,10 +351,8 @@ body {
 
 /* During redeem and travel, keep only the top bar (Restart + wallet) visible. */
 #app[data-state="redeem"] .hud-objectives,
-#app[data-state="redeem"] .hud-fox,
 #app[data-state="redeem"] .hud-trip,
 #app[data-state="travel"] .hud-objectives,
-#app[data-state="travel"] .hud-fox,
 #app[data-state="travel"] .hud-trip { display: none; }
 #app[data-state="travel"] .hud-place { visibility: hidden; }
 
@@ -427,3 +368,68 @@ body {
   .btn--cta { margin-top: 8px; min-height: 48px; }
   .btn--restart-final { margin-top: 2px; min-height: 36px; }
 }
+
+/* ---------- passport progress bar + toast ---------- */
+.hud-objectives { padding: 5px 8px 5px 8px; gap: 8px; }
+.passport-bar {
+  position: relative;
+  width: 96px; height: 22px;
+  border-radius: 999px;
+  background: rgba(255,246,232,0.15);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 2px rgba(255,246,232,0.25);
+}
+.passport-bar-fill {
+  position: absolute; inset: 0; width: 0;
+  background: linear-gradient(90deg, var(--orange), #FFD966);
+  border-radius: 999px;
+  transition: width 0.3s cubic-bezier(.34,1.56,.64,1);
+}
+.passport-bar-text {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; color: var(--cream); text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.passport-bar.flash-up { animation: bar-up 0.35s ease; }
+.passport-bar.flash-down { animation: bar-down 0.45s ease; }
+@keyframes bar-up { 40% { transform: scale(1.08); } }
+@keyframes bar-down { 20%, 60% { transform: translateX(-3px); box-shadow: inset 0 0 0 2px #E0533B; } 40%, 80% { transform: translateX(3px); } }
+
+.hud-toast {
+  position: absolute; left: 50%; top: 36%;
+  transform: translate(-50%, -50%) scale(0.5);
+  font-size: 34px; font-weight: 700; color: var(--cream);
+  text-shadow: 0 3px 0 var(--purple), 0 6px 16px rgba(0,0,0,0.4);
+  opacity: 0; pointer-events: none; white-space: nowrap;
+}
+.hud-toast.show { animation: toast-in 1.4s cubic-bezier(.34,1.56,.64,1) forwards; }
+.hud-toast.toast--speed { color: #FFD966; }
+@keyframes toast-in { 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 70% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -70%) scale(1); } }
+
+/* ---------- runner scene ---------- */
+.fox-root { will-change: transform; }
+.fox-root .fox-body { animation: fox-run 0.36s ease-in-out infinite; transform-origin: 0 20px; }
+@keyframes fox-run { 50% { transform: translateY(-6px) rotate(-3deg); } }
+.fox-root .leg-a { animation: leg-a 0.36s ease-in-out infinite; transform-origin: -20px 30px; }
+.fox-root .leg-b { animation: leg-b 0.36s ease-in-out infinite; transform-origin: 20px 30px; }
+@keyframes leg-a { 50% { transform: rotate(35deg); } }
+@keyframes leg-b { 50% { transform: rotate(-35deg); } }
+.fox-root.stunned .fox-inner { animation: fox-stun 0.7s linear; }
+@keyframes fox-stun { 0%, 100% { opacity: 1; } 20%, 60% { opacity: 0.35; } 40%, 80% { opacity: 1; } }
+.fox-root.finished .fox-body { animation: fox-cheer 0.5s ease-in-out infinite; }
+@keyframes fox-cheer { 50% { transform: translateY(-16px) scale(1.06); } }
+
+.entity { will-change: transform; }
+.entity--item .entity-anim { animation: item-bob 1.4s ease-in-out infinite; }
+@keyframes item-bob { 50% { transform: translateY(-5px) rotate(6deg); } }
+.entity.collected .entity-anim { animation: item-pop 0.3s ease forwards; }
+@keyframes item-pop { 40% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(0); opacity: 0; } }
+.entity.bumped .entity-anim { animation: obstacle-bump 0.45s ease forwards; }
+@keyframes obstacle-bump { 30% { transform: translateX(-6px) rotate(-10deg); } 60% { transform: translateX(5px) rotate(8deg); } 100% { transform: none; } }
+.entity.fade { transition: opacity 0.5s ease; opacity: 0; }
+
+.bubble-bg { fill: var(--cream); stroke: rgba(32,19,56,0.15); }
+.bubble-text { font-family: var(--font); font-size: 12px; font-weight: 600; fill: var(--ink); }
+.hint-hand-inner { animation: hint-hand 1s ease-in-out infinite; }
+@keyframes hint-hand { 0%, 100% { transform: translateY(-22px); } 50% { transform: translateY(22px); } }
+
+.float-text--bad { color: #FFB38A; text-shadow: 0 2px 0 #7a1f10, 0 4px 10px rgba(0,0,0,0.4); }

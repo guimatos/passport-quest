@@ -1,18 +1,18 @@
 import type { DestinationDef, ItemId } from '../data/destinations';
 import { DESTINATIONS } from '../data/destinations';
 import { ITEM_ART } from '../art/items';
-import { foxSvg, type FoxMood } from '../art/fox';
 import { $, centerOf } from '../lib/dom';
 
 /**
- * In-game HUD: restart, destination label, demo-points wallet, objectives
- * (silhouettes that fill in) and the fox guide with a speech bubble.
+ * In-game HUD: restart, destination label, demo-points wallet, the three
+ * item types as silhouettes that fill in when first discovered, and the
+ * passport progress bar.
  */
 export class Hud {
   private pointsEl!: HTMLElement;
-  private bubbleEl!: HTMLElement;
-  private foxEl!: HTMLElement;
   private objectivesEl!: HTMLElement;
+  private barFill!: HTMLElement;
+  private barText!: HTMLElement;
 
   constructor(private root: HTMLElement) {}
 
@@ -34,20 +34,19 @@ export class Hud {
         </div>
       </div>
       <div class="hud-objectives">
-        <span class="hud-objectives-title">Find</span>
         <div class="objectives"></div>
-        <span class="hud-progress"><b class="hud-progress-n">0</b>/3</span>
+        <div class="passport-bar" role="progressbar" aria-label="Passport progress">
+          <div class="passport-bar-fill"></div>
+          <span class="passport-bar-text">0/0</span>
+        </div>
       </div>
-      <div class="hud-fox">
-        <div class="hud-bubble" role="status"></div>
-        <div class="hud-fox-avatar">${foxSvg('idle')}</div>
-      </div>
+      <div class="hud-toast" role="status"></div>
       <div class="hud-trip" aria-label="Trip progress"></div>`;
     this.root.hidden = false;
     this.pointsEl = $('.wallet-points', this.root);
-    this.bubbleEl = $('.hud-bubble', this.root);
-    this.foxEl = $('.hud-fox-avatar', this.root);
     this.objectivesEl = $('.objectives', this.root);
+    this.barFill = $('.passport-bar-fill', this.root);
+    this.barText = $('.passport-bar-text', this.root);
     $('.btn--restart', this.root).addEventListener('click', onRestart, { signal });
   }
 
@@ -60,17 +59,23 @@ export class Hud {
         <svg viewBox="-28 -28 56 56" class="objective-art">${ITEM_ART[it.id]()}</svg>
         <span class="objective-check" aria-hidden="true"></span>
       </div>`).join('');
-    $('.hud-progress-n', this.root).textContent = '0';
+    this.setProgress(0, dest.level.goal);
     $('.hud-trip', this.root).innerHTML = DESTINATIONS.map((d) => {
       const state = completedIds.includes(d.id) ? 'done' : d.id === dest.id ? 'active' : 'locked';
       return `<span class="trip-dot trip-dot--${state}" title="${d.name}"></span>`;
     }).join('<span class="trip-line"></span>');
   }
 
-  markCollected(id: ItemId, count: number) {
-    const obj = this.root.querySelector<HTMLElement>(`.objective[data-id="${id}"]`);
-    obj?.classList.add('found');
-    $('.hud-progress-n', this.root).textContent = String(count);
+  markDiscovered(id: ItemId) {
+    this.root.querySelector(`.objective[data-id="${id}"]`)?.classList.add('found');
+  }
+
+  setProgress(value: number, goal: number, flash: 'up' | 'down' | null = null) {
+    this.barFill.style.width = `${(value / goal) * 100}%`;
+    this.barText.textContent = `${value}/${goal}`;
+    const bar = $('.passport-bar', this.root);
+    bar.classList.remove('flash-up', 'flash-down');
+    if (flash) { void bar.offsetWidth; bar.classList.add(`flash-${flash}`); }
   }
 
   setPoints(points: number, animate = false) {
@@ -78,23 +83,18 @@ export class Hud {
     if (animate) {
       const w = $('.wallet', this.root);
       w.classList.remove('pulse');
-      void w.offsetWidth; // restart animation
+      void w.offsetWidth;
       w.classList.add('pulse');
     }
   }
 
-  say(text: string, mood: FoxMood = 'happy') {
-    this.bubbleEl.textContent = text;
-    this.bubbleEl.classList.add('show');
-    this.foxEl.innerHTML = foxSvg(mood);
-    this.foxEl.classList.remove('bounce');
-    void this.foxEl.offsetWidth;
-    this.foxEl.classList.add('bounce');
-  }
-
-  hush() {
-    this.bubbleEl.classList.remove('show');
-    this.foxEl.innerHTML = foxSvg('idle');
+  /** Big short-lived label in the middle of the screen ("Faster!", "Ouch!"). */
+  toast(text: string, cls = '') {
+    const el = $('.hud-toast', this.root);
+    el.textContent = text;
+    el.className = `hud-toast ${cls}`;
+    void el.offsetWidth;
+    el.classList.add('show');
   }
 
   walletPoint() { return centerOf($('.wallet-coin', this.root).getBoundingClientRect()); }
@@ -102,6 +102,7 @@ export class Hud {
     const el = this.root.querySelector(`.objective[data-id="${id}"]`);
     return el ? centerOf(el.getBoundingClientRect()) : this.walletPoint();
   }
+  barPoint() { return centerOf($('.passport-bar', this.root).getBoundingClientRect()); }
 
   unmount() { this.root.innerHTML = ''; this.root.hidden = true; }
 }
