@@ -857,3 +857,9 @@ g:nth-child(3n) > .bulb { animation-delay: -1.1s; }
 
 /* ---------- dev perf overlay (?perf=1) ---------- */
 .perf { position: absolute; left: 8px; top: 50%; z-index: 60; font-size: 10px; font-weight: 700; color: #FFD966; background: rgba(32,19,56,0.75); padding: 3px 6px; border-radius: 6px; pointer-events: none; white-space: nowrap; }
+
+/* ---------- prefers-reduced-motion: ambient decoration stops; run cycle, pops and HUD transitions stay (they convey state) ---------- */
+#app.reduced-motion .waves, #app.reduced-motion .boat, #app.reduced-motion .palm-crown, #app.reduced-motion .cloud,
+#app.reduced-motion .gull-far, #app.reduced-motion .laundry, #app.reduced-motion .bridge-tram, #app.reduced-motion .bulb,
+#app.reduced-motion .firework, #app.reduced-motion .sj-balloon, #app.reduced-motion .smoke, #app.reduced-motion .cabin,
+#app.reduced-motion .start-capy, #app.reduced-motion .start-fox, #app.reduced-motion .hint-hand-inner { animation: none !important; }

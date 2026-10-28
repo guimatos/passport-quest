@@ -13,6 +13,7 @@ const OBSTACLE_RADIUS = 18;
 const SPAWN_X = SCENE_W + 70;
 const DESPAWN_X = -80;
 const FOLLOW_RATE = 11; // per second; higher = snappier follow
+const POOL_MAX = 12; // pooled nodes kept per kind:id
 
 export interface Entity {
   kind: 'item' | 'obstacle';
@@ -100,6 +101,7 @@ export class Runner {
     };
     stage.addEventListener('pointermove', follow, { signal, passive: true });
     stage.addEventListener('pointerdown', follow, { signal, passive: true });
+    window.addEventListener('resize', () => { this.rect = null; }, { signal }); // orientation changes fire resize too
     // pointercancel / pointerleave: nothing is held, the fox simply keeps its current target.
   }
 
@@ -111,19 +113,20 @@ export class Runner {
     return Math.max(band.top, Math.min(band.bottom, y));
   }
 
-  /** Convert a viewport Y (CSS px) to scene units, accounting for the slice fit. */
-  private toSceneY(clientY: number) {
-    const r = this.el.getBoundingClientRect();
+  /** The scene's client rect and slice fit, cached until the next resize (getBoundingClientRect forces layout). */
+  private rect: DOMRect | null = null;
+  private fit() {
+    if (!this.rect) this.rect = this.el.getBoundingClientRect();
+    const r = this.rect;
     const s = Math.max(r.width / SCENE_W, r.height / SCENE_H);
-    return (clientY - r.top - (r.height - SCENE_H * s) / 2) / s;
+    return { s, ox: r.left + (r.width - SCENE_W * s) / 2, oy: r.top + (r.height - SCENE_H * s) / 2 };
   }
 
+  /** Convert a viewport Y (CSS px) to scene units, accounting for the slice fit. */
+  private toSceneY(clientY: number) { const { s, oy } = this.fit(); return (clientY - oy) / s; }
+
   /** Convert scene coordinates to viewport CSS px (for effects). */
-  toScreen(x: number, y: number) {
-    const r = this.el.getBoundingClientRect();
-    const s = Math.max(r.width / SCENE_W, r.height / SCENE_H);
-    return { x: r.left + (r.width - SCENE_W * s) / 2 + x * s, y: r.top + (r.height - SCENE_H * s) / 2 + y * s };
-  }
+  toScreen(x: number, y: number) { const { s, ox, oy } = this.fit(); return { x: ox + x * s, y: oy + y * s }; }
 
   foxScreenPoint() { return this.toScreen(FOX_X, this.foxY); }
 
@@ -192,7 +195,7 @@ export class Runner {
     }
     // Despawn off-screen or finished entities
     this.entities = this.entities.filter((e) => {
-      if (e.x < DESPAWN_X) { e.el.remove(); return false; }
+      if (e.x < DESPAWN_X) { this.release(e); return false; }
       return true;
     });
   }
@@ -223,14 +226,30 @@ export class Runner {
     return list[list.length - 1];
   }
 
+  /** Entity <g> nodes are pooled per kind:id so a run allocates each item/obstacle markup only once or twice. */
+  private pool = new Map<string, SVGGElement[]>();
+  poolSize() { let n = 0; for (const l of this.pool.values()) n += l.length; return n; }
+
   private addEntity(kind: Entity['kind'], id: ItemId | ObstacleId, x: number, y: number, scale: number, markup: string) {
-    const el = document.createElementNS(SVG_NS, 'g');
-    el.setAttribute('class', `entity entity--${kind} entity--${id}`);
-    el.innerHTML = `<g class="entity-anim"><g class="entity-art" transform="scale(${scale})">${markup}</g></g>`;
+    const key = `${kind}:${id}`;
+    let el = this.pool.get(key)?.pop();
+    if (!el) {
+      el = document.createElementNS(SVG_NS, 'g');
+      el.setAttribute('class', `entity entity--${kind} entity--${id}`);
+      el.innerHTML = `<g class="entity-anim"><g class="entity-art" transform="scale(${scale})">${markup}</g></g>`;
+    }
+    el.setAttribute('transform', `translate(${x} ${y}) scale(${this.depthScale(y)})`);
     this.entityLayer.appendChild(el);
-    const e: Entity = { kind, id, x, y, el, done: false };
-    e.el.setAttribute('transform', `translate(${x} ${y}) scale(${this.depthScale(y)})`);
-    this.entities.push(e);
+    this.entities.push({ kind, id, x, y, el, done: false });
+  }
+
+  private release(e: Entity) {
+    e.el.classList.remove('collected', 'bumped', 'fade');
+    e.el.remove();
+    const key = `${e.kind}:${e.id}`;
+    const list = this.pool.get(key) ?? [];
+    if (list.length < POOL_MAX) list.push(e.el);
+    this.pool.set(key, list);
   }
 
   /** Debug/test accessor: upcoming live entities in scene units. */
@@ -257,5 +276,5 @@ export class Runner {
     this.entities.forEach((e) => e.el.classList.add('fade'));
   }
 
-  destroy() { this.el.remove(); this.entities = []; }
+  destroy() { this.el.remove(); this.entities = []; this.pool.clear(); }
 }

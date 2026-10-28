@@ -105,6 +105,7 @@ check(r1.state === 'redeem', 'redeem state after completion');
 check(r1.progress === 16, 'progress capped at goal (16)');
 check(r1.points >= 16 * 10, `points include bonus (${r1.points})`);
 check((await page.$('.btn--continue')) !== null, 'redeem card visible');
+check((await page.evaluate(() => window.passportQuest.debug.pool)) > 0, 'entity nodes are pooled and reused');
 await page.tap('.btn--continue');
 await page.tap('.btn--continue').catch(() => {});
 await sleep(200);
@@ -178,6 +179,15 @@ for (let i = 0; i < 12; i++) {
   check(await page.$eval('#fx', (e) => e.childElementCount) === 0, `iteration ${i}: fx cleared`);
   check(await page.$eval('#scene-root', (e) => e.childElementCount) === 0, `iteration ${i}: scene cleared`);
 }
+// prefers-reduced-motion: class applied on restart and followed live
+await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+await page.tap('.btn--play'); await sleep(80); await page.tap('.btn--restart'); await sleep(60);
+check(await page.$eval('#app', (e) => e.classList.contains('reduced-motion')), 'reduced-motion class applied');
+check((await page.evaluate(() => window.passportQuest.debug.reducedMotion)) === true, 'reduced motion reported to the game');
+await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+await sleep(50);
+check(!(await page.$eval('#app', (e) => e.classList.contains('reduced-motion'))), 'reduced-motion class removed when the preference changes');
+
 await page.tap('.btn--play'); await sleep(100); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="party"]'); await sleep(100);
 check((await state()) === 'playing' && (await dbg()).points === 0, 'points reset after restarts');
 

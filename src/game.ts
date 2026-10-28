@@ -66,6 +66,7 @@ export class Game {
   private bubbleTimer: number | undefined;
   /** Dev overlay from ?perf=1; survives reset() on purpose (URL flag, not game state). */
   private perf: PerfOverlay | null = null;
+  private reducedMotion: () => boolean = () => false;
 
   private readonly app = $('#app');
   private readonly stage = $('#stage');
@@ -128,6 +129,12 @@ export class Game {
     }, { signal });
     window.addEventListener('resize', () => this.checkOrientation(), { signal });
     window.addEventListener('orientationchange', () => this.checkOrientation(), { signal });
+
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const applyMotion = () => this.app.classList.toggle('reduced-motion', motion.matches);
+    applyMotion();
+    motion.addEventListener('change', applyMotion, { signal });
+    this.reducedMotion = () => motion.matches;
 
     this.loop.setPaused('hidden', document.visibilityState === 'hidden');
     this.checkOrientation();
@@ -205,13 +212,14 @@ export class Game {
     const P0 = prev >= 0 ? (prev === 0 ? MAP_POINTS.rio : MAP_POINTS.porto) : (index === 0 ? MAP_POINTS.entry : MAP_POINTS.entryRight);
     const P1 = prev >= 0 ? MAP_POINTS.routeControl : (index === 0 ? MAP_POINTS.entryControl : MAP_POINTS.entryRightControl);
     const duration = prev >= 0 ? 2200 : 1500;
+    let s = parts.map.getBoundingClientRect().width / MAP_W; // read once; the tween must not force layout every frame
+    window.addEventListener('resize', () => { s = parts.map.getBoundingClientRect().width / MAP_W; }, { signal: this.ac.signal });
     this.clock.tween(duration, (t) => {
       const e = easeInOutCubic(t);
       const x = (1 - e) ** 2 * P0.x + 2 * (1 - e) * e * P1.x + e ** 2 * P2.x;
       const y = (1 - e) ** 2 * P0.y + 2 * (1 - e) * e * P1.y + e ** 2 * P2.y;
       const dx = 2 * (1 - e) * (P1.x - P0.x) + 2 * e * (P2.x - P1.x);
       const dy = 2 * (1 - e) * (P1.y - P0.y) + 2 * e * (P2.y - P1.y);
-      const s = parts.map.getBoundingClientRect().width / MAP_W;
       parts.plane.style.transform = `translate(${x * s}px, ${y * s}px) rotate(${Math.atan2(dy, dx) * 180 / Math.PI}deg)`;
     }, () => {
       this.flying = false;
@@ -409,6 +417,8 @@ export class Game {
       fox: this.runner?.foxPosition ?? null,
       toScreen: (x: number, y: number) => this.runner?.toScreen(x, y) ?? null,
       perf: this.perf?.sample ?? null,
+      pool: this.runner?.poolSize() ?? 0,
+      reducedMotion: this.reducedMotion(),
     };
   }
 }
