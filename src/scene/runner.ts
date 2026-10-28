@@ -1,7 +1,7 @@
-import type { DestinationDef, ItemDef, ItemId, ObstacleId } from '../data/destinations';
+import type { DestinationDef, ItemId, ObstacleId, ThemeDef } from '../data/destinations';
 import { ITEM_ART, OBSTACLE_ART } from '../art/items';
-import { SCENE_ART, type ParallaxLayer } from '../art/scenes';
-import { foxGroup, type FoxMood } from '../art/fox';
+import { SCENE_ART, sceneLayers, type ParallaxLayer } from '../art/scenes';
+import { capyGroup, type CapyMood } from '../art/capy';
 import { svgFromString, SVG_NS } from '../lib/dom';
 
 export const SCENE_W = 360;
@@ -31,7 +31,7 @@ export interface RunnerHandlers {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
- * The endless-runner scene: parallax layers, the fox following the pointer
+ * The endless-runner scene: parallax layers, Capi following the pointer
  * vertically, and items/obstacles streaming in from the right. All motion is
  * driven by update(dt) from the game loop, so it pauses with the game.
  * The runner owns no timers of its own; difficulty is a function of elapsed time.
@@ -42,7 +42,6 @@ export class Runner {
   private entityLayer: SVGGElement;
   private foxG: SVGGElement;
   private foxInner: SVGGElement;
-  private bubbleG: SVGGElement;
   private hintG: SVGGElement;
   private entities: Entity[] = [];
   private foxY: number;
@@ -55,14 +54,16 @@ export class Runner {
 
   constructor(
     private dest: DestinationDef,
-    /** Collectibles for this run (the chosen theme's items). */
-    private items: ItemDef[],
+    /** The chosen theme: its items stream in, its costume and environment variant are used. */
+    private theme: ThemeDef,
     private handlers: RunnerHandlers,
     private random: () => number,
     signal: AbortSignal,
     stage: HTMLElement,
   ) {
     const art = SCENE_ART[dest.id];
+    const variant = art.variants[theme.id];
+    const layers = sceneLayers(art, theme.id);
     this.foxY = this.targetY = (art.band.top + art.band.bottom) / 2;
 
     const layerMarkup = (l: ParallaxLayer, cls: string) =>
@@ -70,12 +71,11 @@ export class Runner {
 
     this.el = svgFromString(`
       <svg class="scene scene--${dest.id}" viewBox="0 0 ${SCENE_W} ${SCENE_H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <g class="backdrop">${art.backdrop}</g>
-        ${art.layers.map((l) => layerMarkup(l, 'layer-back')).join('')}
+        <g class="backdrop">${variant?.backdrop ?? art.backdrop}</g>
+        ${layers.map((l) => layerMarkup(l, 'layer-back')).join('')}
         <g class="entities"></g>
-        <g class="fox-root"><ellipse class="fox-shadow" cy="46" rx="40" ry="8" fill="#201338" opacity="0.18"/><g class="fox-inner">${foxGroup('run')}</g></g>
+        <g class="runner-root"><ellipse class="runner-shadow" cy="46" rx="44" ry="8" fill="#201338" opacity="0.18"/><g class="runner-inner">${capyGroup('run', theme.costume)}</g></g>
         ${art.front.map((l) => layerMarkup(l, 'layer-front')).join('')}
-        <g class="bubble" visibility="hidden"><rect class="bubble-bg" rx="10"/><text class="bubble-text" text-anchor="start"></text></g>
         <g class="hint-hand" visibility="hidden">
           <g class="hint-hand-inner">
             <path d="M0 -26 L0 26 M-10 -14 L0 -26 L10 -14 M-10 14 L0 26 L10 14" stroke="#FFF6E8" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
@@ -84,12 +84,11 @@ export class Runner {
         </g>
       </svg>`);
 
-    const allLayers = [...art.layers, ...art.front];
+    const allLayers = [...layers, ...art.front];
     this.el.querySelectorAll<SVGGElement>('.layer').forEach((g, i) => this.layers.push({ g, def: allLayers[i], offset: 0 }));
     this.entityLayer = this.el.querySelector('.entities')!;
-    this.foxG = this.el.querySelector('.fox-root')!;
-    this.foxInner = this.el.querySelector('.fox-inner')!;
-    this.bubbleG = this.el.querySelector('.bubble')!;
+    this.foxG = this.el.querySelector('.runner-root')!;
+    this.foxInner = this.el.querySelector('.runner-inner')!;
     this.hintG = this.el.querySelector('.hint-hand')!;
     this.placeFox();
 
@@ -136,7 +135,6 @@ export class Runner {
 
   private placeFox() {
     this.foxG.setAttribute('transform', `translate(${FOX_X} ${this.foxY}) scale(${this.depthScale(this.foxY) * 0.6})`);
-    this.bubbleG.setAttribute('transform', `translate(${FOX_X - 34} ${this.foxY - 58})`);
     this.hintG.setAttribute('transform', `translate(${FOX_X + 70} ${this.foxY})`);
   }
 
@@ -201,7 +199,7 @@ export class Runner {
 
   private spawn() {
     const { level, obstacles } = this.dest;
-    const items = this.items;
+    const items = this.theme.items;
     const { band } = SCENE_ART[this.dest.id];
     const obstacleChance = lerp(level.obstacleStart, level.obstacleEnd, this.progressRamp);
     const y = band.top + this.random() * (band.bottom - band.top);
@@ -239,21 +237,8 @@ export class Runner {
   liveEntities() { return this.entities.filter((e) => !e.done).map((e) => ({ kind: e.kind, id: e.id, x: e.x, y: e.y })); }
   get foxPosition() { return { x: FOX_X, y: this.foxY }; }
 
-  setMood(mood: FoxMood) {
-    this.foxInner.innerHTML = foxGroup(mood);
-  }
-
-  /** Short speech bubble anchored to the fox. */
-  say(text: string | null) {
-    if (!text) { this.bubbleG.setAttribute('visibility', 'hidden'); return; }
-    const t = this.bubbleG.querySelector<SVGTextElement>('.bubble-text')!;
-    const bg = this.bubbleG.querySelector<SVGRectElement>('.bubble-bg')!;
-    t.textContent = text;
-    const w = Math.max(60, text.length * 7.2 + 20);
-    bg.setAttribute('x', '0'); bg.setAttribute('y', '-18');
-    bg.setAttribute('width', String(w)); bg.setAttribute('height', '30');
-    t.setAttribute('x', '10'); t.setAttribute('y', '3');
-    this.bubbleG.setAttribute('visibility', 'visible');
+  setMood(mood: CapyMood) {
+    this.foxInner.innerHTML = capyGroup(mood, this.theme.costume);
   }
 
   setHint(on: boolean) {

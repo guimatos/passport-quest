@@ -62,7 +62,7 @@ await sleep(1800); await shot('01b-intro');
 check(await page.$eval('.intro-card', (e) => e.classList.contains('show')), 'intro card shown after the plane lands');
 check((await page.$$('.theme-btn')).length === 3, 'intro offers 3 themes');
 await page.tap('.theme-btn[data-theme="food"]');
-await page.tap('.theme-btn[data-theme="beach"]').catch(() => {});
+await page.tap('.theme-btn[data-theme="party"]').catch(() => {});
 await sleep(200);
 check((await state()) === 'playing', 'choosing a theme enters playing (second tap ignored)');
 check((await dbg()).chosen.brazil === 'food', 'chosen theme recorded (food)');
@@ -112,8 +112,8 @@ await sleep(200);
 check((await state()) === 'intro', 'journal continue enters the Porto intro');
 await sleep(2600); await shot('05-intro-porto');
 check(await page.$$eval('.map-marker--done', (els) => els.length) === 1, 'map shows Rio as done');
-await page.tap('.theme-btn[data-theme="festa"]'); await sleep(200);
-check((await state()) === 'playing' && (await dbg()).chosen.portugal === 'festa', 'Porto theme chosen (festa)');
+await page.tap('.theme-btn[data-theme="party"]'); await sleep(200);
+check((await state()) === 'playing' && (await dbg()).chosen.portugal === 'party', 'Porto theme chosen (party)');
 check(await page.$eval('.hud-place-name', (e) => e.textContent) === 'Porto', 'HUD shows Porto');
 await shot('06-porto');
 const t1 = Date.now();
@@ -141,7 +141,7 @@ check((await state()) === 'start', 'restart from final -> start');
 for (let i = 0; i < 12; i++) {
   await page.tap('.btn--play'); await sleep(80);
   if (i % 4 === 3) { check((await state()) === 'intro', `iteration ${i}: restart from intro`); await page.tap('.btn--restart'); await sleep(60); check((await state()) === 'start', `restart iteration ${i} -> start`); continue; }
-  await sleep(1700); await page.tap(`.theme-btn[data-theme="${['food', 'beach', 'party'][i % 3]}"]`); await sleep(80);
+  await sleep(1700); await page.tap(`.theme-btn[data-theme="${['food', 'party', 'culture'][i % 3]}"]`); await sleep(80);
   if (i % 3 === 1) {
     await autopilot(90000, 'item'); await sleep(1200);
     await page.tap('.btn--continue'); await sleep(300);

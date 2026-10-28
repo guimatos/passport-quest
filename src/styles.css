@@ -408,25 +408,25 @@ body {
 @keyframes toast-in { 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 70% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -70%) scale(1); } }
 
 /* ---------- runner scene: fox run cycle ---------- */
-.fox-root { will-change: transform; }
-.fox-root .fox-body { animation: fox-run 0.4s ease-in-out infinite; transform-origin: 0 10px; }
+.runner-root { will-change: transform; }
+.runner-root .runner-body { animation: fox-run 0.4s ease-in-out infinite; transform-origin: 0 10px; }
 @keyframes fox-run { 50% { transform: translateY(-5px) rotate(-4deg); } }
-.fox-root .fox-head { animation: fox-head 0.4s ease-in-out infinite; transform-origin: 20px -10px; }
+.runner-root .runner-head { animation: fox-head 0.4s ease-in-out infinite; transform-origin: 20px -10px; }
 @keyframes fox-head { 50% { transform: translateY(2px) rotate(3deg); } }
-.fox-root .fox-tail { animation: fox-tail 0.4s ease-in-out infinite; transform-origin: -30px 6px; }
+.runner-root .fox-tail { animation: fox-tail 0.4s ease-in-out infinite; transform-origin: -30px 6px; }
 @keyframes fox-tail { 50% { transform: rotate(14deg); } }
-.fox-root .leg { animation: leg-cycle 0.4s linear infinite; }
-.fox-root .leg-back-a { transform-origin: -6px 18px; animation-delay: 0s; }
-.fox-root .leg-front-a { transform-origin: 24px 18px; animation-delay: -0.2s; }
-.fox-root .leg-back-b { transform-origin: -14px 16px; animation-delay: -0.2s; }
-.fox-root .leg-front-b { transform-origin: 16px 16px; animation-delay: 0s; }
+.runner-root .leg { animation: leg-cycle 0.4s linear infinite; }
+.runner-root .leg-back-a { transform-origin: -6px 18px; animation-delay: 0s; }
+.runner-root .leg-front-a { transform-origin: 24px 18px; animation-delay: -0.2s; }
+.runner-root .leg-back-b { transform-origin: -14px 16px; animation-delay: -0.2s; }
+.runner-root .leg-front-b { transform-origin: 16px 16px; animation-delay: 0s; }
 @keyframes leg-cycle { 0% { transform: rotate(-38deg); } 50% { transform: rotate(38deg); } 100% { transform: rotate(-38deg); } }
-.fox-root.stunned .fox-inner { animation: fox-stun 0.7s linear; }
+.runner-root.stunned .runner-inner { animation: fox-stun 0.7s linear; }
 @keyframes fox-stun { 0%, 100% { opacity: 1; } 20%, 60% { opacity: 0.35; } 40%, 80% { opacity: 1; } }
-.fox-root.finished .fox-body { animation: fox-cheer 0.5s ease-in-out infinite; }
-.fox-root.finished .leg { animation: none; }
+.runner-root.finished .runner-body { animation: fox-cheer 0.5s ease-in-out infinite; }
+.runner-root.finished .leg { animation: none; }
 @keyframes fox-cheer { 50% { transform: translateY(-18px) rotate(-8deg); } }
-.fox-root .fox-shadow { transform-origin: 0 0; animation: shadow-pulse 0.4s ease-in-out infinite; }
+.runner-root .runner-shadow { transform-origin: 0 0; animation: shadow-pulse 0.4s ease-in-out infinite; }
 @keyframes shadow-pulse { 50% { transform: scale(0.85); opacity: 0.25; } }
 
 /* ---------- ambient scene motion (all CSS, paused with the game) ---------- */
@@ -463,8 +463,6 @@ body {
 @keyframes obstacle-bump { 30% { transform: translateX(-6px) rotate(-10deg); } 60% { transform: translateX(5px) rotate(8deg); } 100% { transform: none; } }
 .entity.fade { transition: opacity 0.5s ease; opacity: 0; }
 
-.bubble-bg { fill: var(--cream); stroke: rgba(32,19,56,0.15); }
-.bubble-text { font-family: var(--font); font-size: 12px; font-weight: 600; fill: var(--ink); }
 .hint-hand-inner { animation: hint-hand 1s ease-in-out infinite; }
 @keyframes hint-hand { 0%, 100% { transform: translateY(-22px); } 50% { transform: translateY(22px); } }
 
@@ -701,4 +699,67 @@ body {
   .theme-text em { font-size: 9.5px; }
   .intro-avoid { margin-top: 3px; }
   .intro-avoid svg { width: 20px; height: 20px; }
+}
+
+/* ---------- fox guide in the HUD ---------- */
+.hud-fox {
+  position: absolute;
+  left: 8px;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  display: flex; align-items: flex-end; gap: 6px;
+  max-width: calc(100% - 100px);
+}
+.hud-fox-avatar { width: 58px; height: 66px; flex: none; }
+.hud-fox-avatar svg { width: 100%; height: 100%; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.3)); }
+.hud-fox-avatar.bounce { animation: fox-bounce 0.5s cubic-bezier(.34,1.56,.64,1); }
+@keyframes fox-bounce { 30% { transform: translateY(-10px) scale(1.08); } 100% { transform: none; } }
+.hud-bubble {
+  background: var(--cream); color: var(--ink);
+  font-weight: 600; font-size: 13px; line-height: 1.2;
+  padding: 7px 11px; border-radius: 14px 14px 14px 4px; margin-bottom: 16px;
+  max-width: 200px;
+  opacity: 0; transform: translateY(6px) scale(0.9); transform-origin: left bottom;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(.34,1.56,.64,1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.hud-bubble.show { opacity: 1; transform: none; }
+#app[data-state="redeem"] .hud-fox, #app[data-state="journal"] .hud-fox, #app[data-state="intro"] .hud-fox { display: none; }
+
+/* ---------- theme-specific ambient motion ---------- */
+.bulb { animation: twinkle 1.6s ease-in-out infinite; }
+g:nth-child(2n) > .bulb { animation-delay: -0.5s; }
+g:nth-child(3n) > .bulb { animation-delay: -1.1s; }
+@keyframes twinkle { 50% { opacity: 0.35; } }
+.firework { animation: firework 2.6s ease-out infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+.firework.fw-b { animation-delay: -0.9s; } .firework.fw-c { animation-delay: -1.7s; }
+@keyframes firework { 0% { transform: scale(0.1); opacity: 0; } 12% { opacity: 1; } 55% { transform: scale(1); opacity: 0; } 100% { transform: scale(1); opacity: 0; } }
+.sj-balloon { animation: sj-rise 11s linear infinite; }
+.sj-balloon.sjb-b { animation-delay: -5s; }
+@keyframes sj-rise { 0% { transform: translate(0, 90px); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translate(24px, -220px); opacity: 0; } }
+.smoke { animation: smoke 2.6s ease-out infinite; transform-box: fill-box; transform-origin: bottom center; }
+@keyframes smoke { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 20% { opacity: 0.6; } 100% { transform: translateY(-40px) scale(1.3); opacity: 0; } }
+.cabin { animation: cabin 11s ease-in-out infinite alternate; }
+@keyframes cabin { from { transform: translate(0, 0); } to { transform: translate(142px, -142px); } }
+
+/* ---------- Capi on screens ---------- */
+.start-duo { display: flex; align-items: flex-end; justify-content: center; gap: 0; margin-bottom: -4px; }
+.start-capy { width: 118px; height: 136px; z-index: 1; animation: float 2.8s ease-in-out infinite; }
+.start-capy svg, .theme-capy svg { width: 100%; height: 100%; }
+.start-duo .start-fox { width: 72px; height: 82px; margin-left: -18px; margin-bottom: 4px; animation-delay: -1.2s; }
+.start-duo .start-fox svg { filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); }
+.final-duo .start-capy { width: 96px; height: 110px; }
+.final-duo .start-fox { width: 60px; height: 68px; }
+.theme-capy { width: 44px; height: 52px; flex: none; }
+.theme-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
+.theme-side .theme-icon { width: 20px; height: 20px; padding: 3px; border-radius: 6px; }
+.theme-items svg { width: 20px; height: 20px; }
+@media (max-height: 600px) {
+  .start-capy { width: 88px; height: 100px; }
+  .start-duo .start-fox { width: 56px; height: 64px; margin-left: -14px; }
+  .final-duo .start-capy { width: 70px; height: 80px; }
+  .final-duo .start-fox { width: 46px; height: 52px; }
+  .theme-capy { width: 38px; height: 44px; }
+  .theme-items svg { width: 18px; height: 18px; }
+  .hud-fox-avatar { width: 50px; height: 56px; }
+  .hud-bubble { font-size: 12px; max-width: 180px; }
 }

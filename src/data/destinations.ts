@@ -6,10 +6,11 @@
  * Scene coordinates are in the shared 360 x 720 viewBox (see runner.ts).
  */
 export type DestinationId = 'brazil' | 'portugal';
-export type ThemeId = 'food' | 'beach' | 'party' | 'culture' | 'festa';
+export type ThemeId = 'food' | 'party' | 'culture';
+export type CostumeId = 'chef' | 'carnival' | 'saojoao' | 'panama' | 'conductor';
 export type ItemId =
   | 'coconut' | 'acai' | 'brigadeiro'
-  | 'football' | 'flipflop' | 'seashell'
+  | 'bondinho' | 'violao' | 'football'
   | 'pandeiro' | 'mask' | 'apito'
   | 'nata' | 'francesinha' | 'sardine'
   | 'azulejo' | 'tram' | 'rabelo'
@@ -43,6 +44,8 @@ export interface ThemeDef {
   short: string;
   /** One line shown on the choice card. */
   pitch: string;
+  /** Costume Capi wears during this run. */
+  costume: CostumeId;
   items: ItemDef[];
   coupon: CouponDef;
 }
@@ -101,7 +104,7 @@ export const DESTINATIONS: DestinationDef[] = [
     stampLabel: 'RIO',
     themes: [
       {
-        id: 'food', label: 'Eat & drink', short: 'Food', pitch: 'Kiosk snacks and beach treats',
+        id: 'food', label: 'Eat & drink', short: 'Food', pitch: 'Kiosk snacks and beach treats', costume: 'chef',
         items: [
           { id: 'coconut', label: 'Coconut', weight: 1.6, scale: 0.9,
             blurb: 'Chilled green coconuts are sold at nearly every kiosk along Copacabana and Ipanema. Água de coco has been the beach drink of Rio for generations.' },
@@ -113,19 +116,7 @@ export const DESTINATIONS: DestinationDef[] = [
         coupon: { itemId: 'coconut', need: 6, title: 'Free coconut water', venue: 'Quiosque da Raposa, Copacabana (demo)' },
       },
       {
-        id: 'beach', label: 'Beach life', short: 'Beach', pitch: 'Sand, surf and footvolley',
-        items: [
-          { id: 'football', label: 'Football', weight: 1.6, scale: 0.85,
-            blurb: 'Rio is home to the Maracanã, built for the 1950 World Cup. On the sand, locals play footvolley, invented on Copacabana beach in the 1960s.' },
-          { id: 'flipflop', label: 'Flip-flop', scale: 0.85,
-            blurb: 'Brazil\'s rubber sandals were launched in 1962, inspired by Japanese zori straw sandals. They are now a symbol of beach life across the country.' },
-          { id: 'seashell', label: 'Seashell', scale: 0.8,
-            blurb: 'Shells wash up along Copacabana\'s 4 km arc. Its wave-patterned promenade, designed by Roberto Burle Marx in 1970, echoes Portuguese calçada paving.' },
-        ],
-        coupon: { itemId: 'football', need: 6, title: 'Footvolley lesson', venue: 'Barraca da Raposa, Ipanema (demo)' },
-      },
-      {
-        id: 'party', label: 'Party & samba', short: 'Samba', pitch: 'Carnival rhythm, day and night',
+        id: 'party', label: 'Party', short: 'Party', pitch: 'Carnival rhythm, day and night', costume: 'carnival',
         items: [
           { id: 'pandeiro', label: 'Pandeiro', weight: 1.6, scale: 0.85,
             blurb: 'The pandeiro is the heartbeat of samba. Rio\'s samba schools parade through the Sambadrome at Carnival with thousands of them.' },
@@ -135,6 +126,18 @@ export const DESTINATIONS: DestinationDef[] = [
             blurb: 'The apito de samba, a three-tone whistle, is blown by the bateria leader to call the beat. Its sound has opened Rio parades since the 1930s.' },
         ],
         coupon: { itemId: 'pandeiro', need: 6, title: 'Samba class', venue: 'Escola da Raposa, Lapa (demo)' },
+      },
+      {
+        id: 'culture', label: 'Culture', short: 'Culture', pitch: 'Sugarloaf, bossa nova and Maracanã', costume: 'panama',
+        items: [
+          { id: 'bondinho', label: 'Cable car', weight: 1.6, scale: 0.85,
+            blurb: 'The Sugarloaf cable car, the bondinho, opened in 1912 and was the first in Brazil. It climbs 396 m in two hops with a view over Guanabara Bay.' },
+          { id: 'violao', label: 'Bossa nova guitar', scale: 0.85,
+            blurb: 'Bossa nova was born in Rio\'s Copacabana apartments in the late 1950s. "The Girl from Ipanema" was written in 1962 in a bar a block from the beach.' },
+          { id: 'football', label: 'Football', scale: 0.85,
+            blurb: 'Rio is home to the Maracanã, built for the 1950 World Cup. On the sand, locals play footvolley, invented on Copacabana beach in the 1960s.' },
+        ],
+        coupon: { itemId: 'bondinho', need: 6, title: 'Cable car ride', venue: 'Bondinho da Raposa, Urca (demo)' },
       },
     ],
     obstacles: [
@@ -160,7 +163,7 @@ export const DESTINATIONS: DestinationDef[] = [
     stampLabel: 'PORTO',
     themes: [
       {
-        id: 'food', label: 'Eat & drink', short: 'Food', pitch: 'Pastry, sandwiches and sardines',
+        id: 'food', label: 'Eat & drink', short: 'Food', pitch: 'Pastry, sandwiches and sardines', costume: 'chef',
         items: [
           { id: 'nata', label: 'Pastel de nata', weight: 1.6, scale: 0.85,
             blurb: 'The custard tart was created by monks in Lisbon before 1834, using leftover egg yolks. Porto bakeries serve them warm with cinnamon.' },
@@ -172,19 +175,7 @@ export const DESTINATIONS: DestinationDef[] = [
         coupon: { itemId: 'nata', need: 6, title: 'Free pastel de nata', venue: 'Pastelaria da Raposa, Ribeira (demo)' },
       },
       {
-        id: 'culture', label: 'Culture & history', short: 'Culture', pitch: 'Tiles, trams and the old quay',
-        items: [
-          { id: 'azulejo', label: 'Azulejo tile', weight: 1.6, scale: 0.8,
-            blurb: 'Porto\'s São Bento station is lined with about 20,000 blue-and-white azulejo tiles, painted by Jorge Colaço between 1905 and 1916.' },
-          { id: 'tram', label: 'Mini tram', scale: 0.85,
-            blurb: 'Porto ran the first electric tram on the Iberian Peninsula in 1895. Heritage line 1 still rattles along the Douro riverside today.' },
-          { id: 'rabelo', label: 'Rabelo boat', scale: 0.85,
-            blurb: 'Flat-bottomed rabelo boats once carried port wine barrels down the Douro to the cellars of Vila Nova de Gaia. Today they line the Ribeira quay.' },
-        ],
-        coupon: { itemId: 'azulejo', need: 6, title: 'Tile-painting workshop', venue: 'Oficina da Raposa, Ribeira (demo)' },
-      },
-      {
-        id: 'festa', label: 'São João festa', short: 'Festa', pitch: 'Hammers, balloons and fireworks',
+        id: 'party', label: 'Party', short: 'Party', pitch: 'São João: hammers, balloons, fireworks', costume: 'saojoao',
         items: [
           { id: 'martelinho', label: 'Plastic hammer', weight: 1.6, scale: 0.85,
             blurb: 'On São João night, 23 June, Porto taps strangers on the head with squeaky plastic hammers, a 20th-century twist on an old leek-tapping custom.' },
@@ -194,6 +185,18 @@ export const DESTINATIONS: DestinationDef[] = [
             blurb: 'A manjerico is a small pot of bush basil given on São João, topped with a paper carnation and a four-line love verse.' },
         ],
         coupon: { itemId: 'martelinho', need: 6, title: 'Festival night pass', venue: 'Festa da Raposa, Fontainhas (demo)' },
+      },
+      {
+        id: 'culture', label: 'Culture', short: 'Culture', pitch: 'Tiles, trams and the old quay', costume: 'conductor',
+        items: [
+          { id: 'azulejo', label: 'Azulejo tile', weight: 1.6, scale: 0.8,
+            blurb: 'Porto\'s São Bento station is lined with about 20,000 blue-and-white azulejo tiles, painted by Jorge Colaço between 1905 and 1916.' },
+          { id: 'tram', label: 'Mini tram', scale: 0.85,
+            blurb: 'Porto ran the first electric tram on the Iberian Peninsula in 1895. Heritage line 1 still rattles along the Douro riverside today.' },
+          { id: 'rabelo', label: 'Rabelo boat', scale: 0.85,
+            blurb: 'Flat-bottomed rabelo boats once carried port wine barrels down the Douro to the cellars of Vila Nova de Gaia. Today they line the Ribeira quay.' },
+        ],
+        coupon: { itemId: 'azulejo', need: 6, title: 'Tile-painting workshop', venue: 'Oficina da Raposa, Ribeira (demo)' },
       },
     ],
     obstacles: [

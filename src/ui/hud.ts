@@ -1,6 +1,7 @@
 import type { DestinationDef, ItemId, ThemeDef } from '../data/destinations';
 import { DESTINATIONS } from '../data/destinations';
 import { ITEM_ART, TICKET_SVG } from '../art/items';
+import { foxSvg, type FoxMood } from '../art/fox';
 import { $, centerOf } from '../lib/dom';
 
 /**
@@ -42,6 +43,10 @@ export class Hud {
         <div class="chips"></div>
       </div>
       <div class="hud-toast" role="status"></div>
+      <div class="hud-fox">
+        <div class="hud-fox-avatar">${foxSvg('happy')}</div>
+        <div class="hud-bubble" role="status"></div>
+      </div>
       <div class="hud-trip" aria-label="Trip progress"></div>`;
     this.root.hidden = false;
     this.pointsEl = $('.wallet-points', this.root);
@@ -112,6 +117,22 @@ export class Hud {
     el.className = `hud-toast ${cls}`;
     void el.offsetWidth;
     el.classList.add('show');
+  }
+
+  /** The Scrambly fox guide speaks from the bottom-left corner. */
+  say(text: string, mood: FoxMood = 'happy') {
+    const bubble = $('.hud-bubble', this.root);
+    const fox = $('.hud-fox-avatar', this.root);
+    bubble.textContent = text;
+    bubble.classList.add('show');
+    fox.innerHTML = foxSvg(mood);
+    fox.classList.remove('bounce');
+    void fox.offsetWidth;
+    fox.classList.add('bounce');
+  }
+
+  hush() {
+    this.root.querySelector('.hud-bubble')?.classList.remove('show');
   }
 
   walletPoint() { return centerOf($('.wallet-coin', this.root).getBoundingClientRect()); }

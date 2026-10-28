@@ -38,14 +38,6 @@ export const ITEM_ART: Record<ItemId, ItemArt> = {
      <circle cx="9" cy="-9" r="3.5" fill="#F7E27A" stroke="#C9A33D" stroke-width="1"/>
      <g fill="#A86D37"><circle cx="-14" cy="-6" r="1.5"/><circle cx="5" cy="-5" r="1.5"/><circle cx="14" cy="-7" r="1.5"/></g>
      <path d="M16 -4 l6 -14" stroke="#F58324" stroke-width="3" stroke-linecap="round"/>`),
-  flipflop: art(
-    `<path d="M-12 -22 Q-16 0 -10 20 Q0 24 10 20 Q16 0 12 -22 Q0 -26 -12 -22 Z" ${S}/>`,
-    `<path d="M-12 -22 Q-16 0 -10 20 Q0 24 10 20 Q16 0 12 -22 Q0 -26 -12 -22 Z" fill="#F2C94C" stroke="#C99A1E" stroke-width="2"/>
-     <path d="M-12 -22 Q-16 0 -10 20 Q0 24 10 20 Q16 0 12 -22 Q0 -26 -12 -22 Z" fill="none" stroke="#1FA463" stroke-width="2" stroke-dasharray="3 100" stroke-dashoffset="-40"/>
-     <path d="M0 -10 Q-8 2 -11 8" stroke="#1FA463" stroke-width="4" fill="none" stroke-linecap="round"/>
-     <path d="M0 -10 Q8 2 11 8" stroke="#1FA463" stroke-width="4" fill="none" stroke-linecap="round"/>
-     <circle cy="-10" r="3" fill="#1FA463"/>
-     <path d="M-4 -18 q4 -2 8 0" stroke="#fff" stroke-width="2" opacity="0.6" stroke-linecap="round"/>`),
   azulejo: art(
     `<rect x="-20" y="-20" width="40" height="40" rx="3" ${S}/>`,
     `<rect x="-20" y="-20" width="40" height="40" rx="3" fill="${CREAM}" stroke="#2E6FD8" stroke-width="2"/>
@@ -82,6 +74,26 @@ export const ITEM_ART: Record<ItemId, ItemArt> = {
      <path d="M-19 -16 h38 v6 q-10 6 -19 2 q-9 4 -19 -2 Z" fill="#F7A072"/>
      <ellipse cx="2" cy="-12" rx="9" ry="6" fill="${CREAM}"/><circle cx="2" cy="-12" r="3.5" fill="#F2C94C"/>
      <g fill="#F2C94C"><rect x="-26" y="2" width="3" height="12" rx="1"/><rect x="-22" y="-1" width="3" height="15" rx="1" transform="rotate(-8 -21 7)"/></g>`),
+  bondinho: art(
+    `<path d="M-24 -22 h48" ${S}/><rect x="-16" y="-12" width="32" height="26" rx="6" ${S}/>`,
+    `<path d="M-26 -24 h52" stroke="${INK}" stroke-width="2.5"/>
+     <path d="M-4 -24 l4 8 l4 -8" stroke="${INK}" stroke-width="2.5" fill="none"/>
+     <rect x="-16" y="-14" width="32" height="28" rx="7" fill="${CREAM}" stroke="${INK}" stroke-width="2"/>
+     <rect x="-16" y="-14" width="32" height="10" rx="5" fill="#2E6FD8"/>
+     <rect x="-12" y="-6" width="9" height="12" rx="2" fill="#9ED5F5" stroke="${INK}" stroke-width="1.5"/>
+     <rect x="3" y="-6" width="9" height="12" rx="2" fill="#9ED5F5" stroke="${INK}" stroke-width="1.5"/>
+     <rect x="-16" y="8" width="32" height="4" fill="#F58324"/>
+     <path d="M-6 -16 l6 -6 l6 6" fill="${INK}"/>`),
+  violao: art(
+    `<path d="M-6 -24 h8 v14 q14 4 14 16 a12 12 0 0 1 -24 0 a10 10 0 0 1 -6 -10 q0 -4 8 -6 Z" ${S}/>`,
+    `<g transform="rotate(-25)">
+       <rect x="-3" y="-30" width="6" height="24" fill="#5A3A20"/>
+       <rect x="-4.5" y="-32" width="9" height="6" rx="1.5" fill="${INK}"/>
+       <path d="M-9 -8 Q-14 -8 -14 0 Q-14 6 -10 8 Q-17 12 -16 20 A16 14 0 0 0 16 20 Q17 12 10 8 Q14 6 14 0 Q14 -8 9 -8 Z" fill="#E8B04B" stroke="#8C4F1D" stroke-width="2" stroke-linejoin="round"/>
+       <circle cx="0" cy="6" r="4.5" fill="#3E2412"/>
+       <rect x="-5" y="18" width="10" height="3" rx="1" fill="#3E2412"/>
+       <path d="M-1.5 -30 v49 M0 -30 v49 M1.5 -30 v49" stroke="${CREAM}" stroke-width="0.8" opacity="0.8"/>
+     </g>`),
   pandeiro: art(
     `<circle r="21" ${S}/>`,
     `<circle r="21" fill="#C98A3A"/>
@@ -114,12 +126,6 @@ export const ITEM_ART: Record<ItemId, ItemArt> = {
      <path d="M-6 14 L-5 20 M6 14 L5 20" stroke="#5A3A20" stroke-width="1.5"/>
      <rect x="-6" y="19" width="12" height="7" rx="2" fill="#8B5A2B" stroke="#5A3A20" stroke-width="1.5"/>
      <circle cx="0" cy="16" r="2.5" fill="#FFD966"/>`),
-  seashell: art(
-    `<path d="M-20 10 Q-18 -20 0 -22 Q18 -20 20 10 Q0 18 -20 10 Z" ${S}/>`,
-    `<path d="M-20 10 Q-18 -20 0 -22 Q18 -20 20 10 Q0 18 -20 10 Z" fill="#FFB38A" stroke="#C96A3F" stroke-width="2"/>
-     <g stroke="#C96A3F" stroke-width="2" fill="none" stroke-linecap="round"><path d="M0 12 L-14 -10 M0 12 L-7 -16 M0 12 L0 -18 M0 12 L7 -16 M0 12 L14 -10"/></g>
-     <path d="M-8 12 q8 8 16 0" fill="#E9906A"/>
-     <circle cx="-6" cy="-6" r="2.5" fill="#fff" opacity="0.6"/>`),
   rabelo: art(
     `<path d="M-23 6 L23 6 L15 18 L-15 18 Z" ${S}/><rect x="-2" y="-22" width="4" height="28" ${S}/><path d="M2 -20 L18 -6 L2 -2 Z" ${S}/>`,
     `<path d="M-23 6 L23 6 L15 18 L-15 18 Z" fill="#8B5A2B" stroke="#3E2412" stroke-width="2"/>
@@ -210,8 +216,6 @@ export const TICKET_SVG = `<svg viewBox="0 0 32 24" class="ticket" aria-hidden="
 /** Theme glyphs for the choice card and passport, centered on (0,0) in a ~28 box. */
 export const THEME_ICONS: Record<string, string> = {
   food: `<path d="M-8 -11 v9 a4 4 0 0 0 8 0 v-9 M-4 -11 v20" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M5 -11 q6 2 6 9 l-3 2 v11" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
-  beach: `<path d="M-11 0 Q0 -14 11 0 Z" fill="currentColor"/><path d="M0 -10 v20" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M-9 11 q9 -4 18 0" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/>`,
   party: `<path d="M-6 8 a3.5 3.5 0 1 0 0.1 0 M7 4 a3.5 3.5 0 1 0 0.1 0 M-2.5 8 v-16 l13 -3 v15" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
   culture: `<path d="M-11 -4 l11 -7 l11 7 Z" fill="currentColor"/><path d="M-8 -3 v10 M-3 -3 v10 M3 -3 v10 M8 -3 v10" stroke="currentColor" stroke-width="2.2"/><rect x="-11" y="8" width="22" height="3" fill="currentColor"/>`,
-  festa: `<path d="M0 -11 v6 M-8 -8 l4 4 M8 -8 l-4 4 M-11 0 h6 M11 0 h-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M0 -2 l-8 14 h16 Z" fill="currentColor"/>`,
 };

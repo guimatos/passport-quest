@@ -18,9 +18,9 @@ const DISCOVER_LINES: Record<ItemId, string> = {
   coconut: 'A coconut! Refreshing.',
   acai: 'Açaí bowl! Energy.',
   brigadeiro: 'Brigadeiro! Sweet.',
+  bondinho: 'The cable car! Up we go.',
+  violao: 'A guitar! Bossa nova time.',
   football: 'Goooal! A football.',
-  flipflop: 'A flip-flop! Beach style.',
-  seashell: 'A seashell! Pretty.',
   pandeiro: 'A pandeiro! Feel the beat.',
   mask: 'A Carnival mask!',
   apito: 'A samba whistle! Tweet!',
@@ -206,8 +206,8 @@ export class Game {
 
     const dest = this.destination;
     const theme = this.theme;
-    this.app.style.setProperty('--scene-bg', SCENE_ART[dest.id].bg);
-    this.runner = new Runner(dest, theme.items, {
+    this.app.style.setProperty('--scene-bg', SCENE_ART[dest.id].variants[theme.id]?.bg ?? SCENE_ART[dest.id].bg);
+    this.runner = new Runner(dest, theme, {
       onCollect: (e, screen) => this.collect(e, screen),
       onHit: (e, screen) => this.hit(e, screen),
     }, this.random, this.ac.signal, this.stage);
@@ -218,7 +218,7 @@ export class Game {
     this.hud.setTheme(theme);
     this.hud.setPoints(this.points);
     const couponItem = theme.items.find((i) => i.id === theme.coupon.itemId)!;
-    this.say(index === 0 ? 'Move up and down to catch items!' : `${dest.name}! Faster this time.`, 2400);
+    this.say(index === 0 ? 'Move up and down to guide Capi!' : `${dest.name}! Faster this time.`, 2400);
     this.clock.after(2600, () => this.say(`Catch ${theme.coupon.need} ${couponItem.label.toLowerCase()}s for a coupon!`, 2600));
     this.armHint();
   }
@@ -264,7 +264,7 @@ export class Game {
     this.hud.setProgress(this.progress, dest.level.goal, 'down');
     this.fx.floatText(screen.x, screen.y - 14, 'Ouch!', 'float-text--bad');
     this.fx.burst(screen.x, screen.y, '#201338', 6);
-    this.say('Ouch! Watch out.', 1000);
+    this.say('Ouch! Watch out, Capi.', 1000, 'think');
   }
 
   private addPoints(n: number) {
@@ -280,7 +280,7 @@ export class Game {
     const theme = this.theme;
     this.completedDests.push(dest.id);
     this.runner?.finish();
-    this.runner?.say(`${dest.shortName} complete!`);
+    this.say(`${dest.shortName} complete! Reward time.`, 3000, 'cheer');
     this.hud.toast('Passport stamped!', 'toast--done');
     this.fx.confetti();
     this.hud.setDestination(dest, this.completedDests);
@@ -323,11 +323,11 @@ export class Game {
 
   // ---------- helpers ----------
 
-  private say(text: string, ms: number) {
-    if (!this.runner || this.state !== 'playing') return;
+  private say(text: string, ms: number, mood: 'happy' | 'cheer' | 'think' = 'happy') {
+    if (this.state !== 'playing' && this.state !== 'redeem') return;
     this.clock.cancel(this.bubbleTimer);
-    this.runner.say(text);
-    this.bubbleTimer = this.clock.after(ms, () => this.runner?.say(null));
+    this.hud.say(text, mood);
+    this.bubbleTimer = this.clock.after(ms, () => this.hud.hush());
   }
 
   /** After HINT_DELAY without a collection, show the move-up-and-down nudge. */
@@ -337,7 +337,7 @@ export class Game {
     this.hintTimer = this.clock.after(HINT_DELAY, () => {
       if (this.state !== 'playing' || !this.runner) return;
       this.runner.setHint(true);
-      this.say('Move up and down to catch items!', 2000);
+      this.say('Move up and down to catch items!', 2000, 'think');
     });
   }
 

@@ -1,6 +1,7 @@
 import type { DestinationDef, ItemId, ThemeDef, ThemeId } from '../data/destinations';
 import { DESTINATIONS, COMPLETION_BONUS, COUPON_BONUS, themeOf } from '../data/destinations';
 import { foxSvg } from '../art/fox';
+import { capySvg } from '../art/capy';
 import { stampSvg, PLANE_SVG, SKYLINE_SVG } from '../art/passport';
 import { ITEM_ART, OBSTACLE_ART, TICKET_SVG, THEME_ICONS } from '../art/items';
 import { mapSvg } from '../art/map';
@@ -23,12 +24,15 @@ export function renderStart(root: HTMLElement, onPlay: () => void, signal: Abort
   root.innerHTML = `
     <section class="screen screen--start">
       <div class="skyline-wrap">${SKYLINE_SVG}</div>
-      <div class="start-fox">${foxSvg('happy')}</div>
+      <div class="start-duo">
+        <div class="start-capy">${capySvg('happy', 'panama')}</div>
+        <div class="start-fox">${foxSvg('happy')}</div>
+      </div>
       <div class="passport-motif" aria-hidden="true">
         <div class="passport-cover"><span>PASSPORT</span></div>
       </div>
       <h1 class="title">Passport<span>Quest</span></h1>
-      <p class="hook">Run from Brazil to Portugal with the Scrambly fox. Pick what to see, catch it, fill your passport.</p>
+      <p class="hook">Capi the capybara runs from Brazil to Portugal. The Scrambly fox guides the way: pick what to see, catch it, fill your passport.</p>
       <ol class="loop-strip" aria-label="How it works">
         <li><b>1</b><span>Discover</span><small>pick a theme</small></li>
         <li><b>2</b><span>Play</span><small>catch &amp; earn</small></li>
@@ -59,13 +63,13 @@ export function renderIntro(root: HTMLElement, dest: DestinationDef, index: numb
         <div class="theme-list">
           ${dest.themes.map((t) => `
             <button class="theme-btn" type="button" data-theme="${t.id}">
-              ${themeIcon(t.id)}
+              <div class="theme-capy">${capySvg('happy', t.costume)}</div>
               <div class="theme-text">
                 <strong>${t.label}</strong>
                 <span>${t.pitch}</span>
                 <em>Coupon: ${t.coupon.title}</em>
               </div>
-              <div class="theme-items">${t.items.map((it) => `<svg viewBox="-28 -28 56 56" aria-hidden="true">${ITEM_ART[it.id]()}</svg>`).join('')}</div>
+              <div class="theme-side">${themeIcon(t.id)}<div class="theme-items">${t.items.map((it) => `<svg viewBox="-28 -28 56 56" aria-hidden="true">${ITEM_ART[it.id]()}</svg>`).join('')}</div></div>
             </button>`).join('')}
         </div>
         <div class="intro-avoid"><span class="intro-label">Avoid</span>${dest.obstacles.map((o) => `<svg viewBox="-28 -28 56 56" title="${o.label}">${OBSTACLE_ART[o.id]}</svg>`).join('')}</div>
@@ -142,11 +146,16 @@ export function renderJournal(root: HTMLElement, dest: DestinationDef, theme: Th
 }
 
 export function renderFinal(root: HTMLElement, points: number, counts: Counts, chosen: Chosen, coupons: string[], onCta: () => void, onRestart: () => void, signal: AbortSignal) {
+  const lastDest = DESTINATIONS[DESTINATIONS.length - 1];
+  const lastCostume = themeOf(lastDest, chosen[lastDest.id] ?? lastDest.themes[0].id).costume;
   const won = DESTINATIONS.flatMap((d) => d.themes.filter((t) => coupons.includes(`${d.id}:${t.id}`)).map((t) => t.coupon.title));
   root.innerHTML = `
     <section class="screen screen--final">
       <div class="skyline-wrap skyline-wrap--final">${SKYLINE_SVG}</div>
-      <div class="final-fox">${foxSvg('cheer')}</div>
+      <div class="start-duo final-duo">
+        <div class="start-capy">${capySvg('cheer', lastCostume)}</div>
+        <div class="start-fox">${foxSvg('cheer')}</div>
+      </div>
       <p class="eyebrow">Trip complete</p>
       <h2>Your passport is full!</h2>
       <div class="passport-open">
