@@ -1,12 +1,13 @@
-import type { DestinationDef, ItemId } from '../data/destinations';
+import type { DestinationDef, ItemId, ThemeDef } from '../data/destinations';
 import { DESTINATIONS } from '../data/destinations';
 import { ITEM_ART, TICKET_SVG } from '../art/items';
 import { $, centerOf } from '../lib/dom';
 
 /**
  * In-game HUD: restart, destination label, demo-points wallet, the passport
- * progress bar, and one chip per item type showing its silhouette until it is
- * discovered plus a running count. The coupon item chip shows "n/need".
+ * progress bar, and one chip per item of the chosen theme (silhouette until
+ * first caught, then a running count). The coupon's signature item shows
+ * "n/need" and turns orange when the coupon unlocks.
  */
 export class Hud {
   private pointsEl!: HTMLElement;
@@ -50,24 +51,29 @@ export class Hud {
     $('.btn--restart', this.root).addEventListener('click', onRestart, { signal });
   }
 
+  /** Shows the destination header and trip dots; chips are set by setTheme once the theme is chosen. */
   setDestination(dest: DestinationDef, completedIds: string[]) {
     $('.hud-place-name', this.root).textContent = dest.shortName;
     $('.hud-place-country', this.root).textContent = dest.country;
-    this.chipsEl.innerHTML = dest.items.map((it) => {
-      const isCoupon = it.id === dest.coupon.itemId;
-      return `
-      <div class="chip ${isCoupon ? 'chip--coupon' : ''}" data-id="${it.id}" title="${it.label}">
-        <svg viewBox="-28 -28 56 56" class="chip-sil">${ITEM_ART[it.id]({ silhouette: true })}</svg>
-        <svg viewBox="-28 -28 56 56" class="chip-art">${ITEM_ART[it.id]()}</svg>
-        <span class="chip-count">${isCoupon ? `0/${dest.coupon.need}` : '0'}</span>
-        ${isCoupon ? `<span class="chip-ticket">${TICKET_SVG}</span>` : ''}
-      </div>`;
-    }).join('');
+    this.chipsEl.innerHTML = '';
     this.setProgress(0, dest.level.goal);
     $('.hud-trip', this.root).innerHTML = DESTINATIONS.map((d) => {
       const state = completedIds.includes(d.id) ? 'done' : d.id === dest.id ? 'active' : 'locked';
       return `<span class="trip-dot trip-dot--${state}" title="${d.name}"></span>`;
     }).join('<span class="trip-line"></span>');
+  }
+
+  setTheme(theme: ThemeDef) {
+    this.chipsEl.innerHTML = theme.items.map((it) => {
+      const isCoupon = it.id === theme.coupon.itemId;
+      return `
+      <div class="chip ${isCoupon ? 'chip--coupon' : ''}" data-id="${it.id}" title="${it.label}${isCoupon ? ` · ${theme.coupon.need} unlock: ${theme.coupon.title}` : ''}">
+        <svg viewBox="-28 -28 56 56" class="chip-sil">${ITEM_ART[it.id]({ silhouette: true })}</svg>
+        <svg viewBox="-28 -28 56 56" class="chip-art">${ITEM_ART[it.id]()}</svg>
+        <span class="chip-count">${isCoupon ? `0/${theme.coupon.need}` : '0'}</span>
+        ${isCoupon ? `<span class="chip-ticket">${TICKET_SVG}</span>` : ''}
+      </div>`;
+    }).join('');
   }
 
   setCount(id: ItemId, count: number, couponNeed?: number, couponDone = false) {

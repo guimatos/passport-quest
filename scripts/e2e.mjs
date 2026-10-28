@@ -21,7 +21,7 @@ await page.goto(url, { waitUntil: 'networkidle0' });
 
 const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/${name}.png` }); };
 const state = () => page.$eval('#app', (el) => el.dataset.state);
-const dbg = () => page.evaluate(() => { const d = window.passportQuest.debug; return { state: d.state, points: d.points, progress: d.progress, fox: d.fox, n: d.entities.length }; });
+const dbg = () => page.evaluate(() => { const d = window.passportQuest.debug; return { state: d.state, points: d.points, progress: d.progress, fox: d.fox, n: d.entities.length, chosen: d.chosen, coupons: d.coupons, entities: d.entities }; });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const check = (cond, msg) => { if (!cond) throw new Error('CHECK FAILED: ' + msg); console.log('ok  ', msg); };
 const hintVisible = () => page.$eval('.hint-hand', (e) => e.getAttribute('visibility') === 'visible');
@@ -60,10 +60,13 @@ await sleep(200);
 check((await state()) === 'intro', 'play enters the level intro');
 await sleep(1800); await shot('01b-intro');
 check(await page.$eval('.intro-card', (e) => e.classList.contains('show')), 'intro card shown after the plane lands');
-await page.tap('.btn--start');
-await page.tap('.btn--start').catch(() => {});
+check((await page.$$('.theme-btn')).length === 3, 'intro offers 3 themes');
+await page.tap('.theme-btn[data-theme="food"]');
+await page.tap('.theme-btn[data-theme="beach"]').catch(() => {});
 await sleep(200);
-check((await state()) === 'playing', 'start button enters playing (double tap ignored)');
+check((await state()) === 'playing', 'choosing a theme enters playing (second tap ignored)');
+check((await dbg()).chosen.brazil === 'food', 'chosen theme recorded (food)');
+check((await page.$$('.chip')).length === 3, 'HUD shows the 3 items of the chosen theme');
 await shot('02-brazil');
 
 // Real pointer: fox follows the mouse Y
@@ -102,14 +105,15 @@ await page.tap('.btn--continue').catch(() => {});
 await sleep(200);
 check((await state()) === 'journal', 'continue enters journal (double tap ignored)');
 await shot('04b-journal');
-check((await page.$$('.journal-row')).length === 5, 'journal lists 5 items');
+check((await page.$$('.journal-row')).length === 3, 'journal lists the 3 themed items');
+check((await dbg()).entities.every((e) => e.kind === 'obstacle' || ['coconut', 'acai', 'brigadeiro'].includes(e.id)), 'only food-theme items spawned in Rio');
 await page.tap('.btn--continue');
 await sleep(200);
 check((await state()) === 'intro', 'journal continue enters the Porto intro');
 await sleep(2600); await shot('05-intro-porto');
 check(await page.$$eval('.map-marker--done', (els) => els.length) === 1, 'map shows Rio as done');
-await sleep(5000);
-check((await state()) === 'playing', 'intro auto-starts Portugal');
+await page.tap('.theme-btn[data-theme="festa"]'); await sleep(200);
+check((await state()) === 'playing' && (await dbg()).chosen.portugal === 'festa', 'Porto theme chosen (festa)');
 check(await page.$eval('.hud-place-name', (e) => e.textContent) === 'Porto', 'HUD shows Porto');
 await shot('06-porto');
 const t1 = Date.now();
@@ -137,7 +141,7 @@ check((await state()) === 'start', 'restart from final -> start');
 for (let i = 0; i < 12; i++) {
   await page.tap('.btn--play'); await sleep(80);
   if (i % 4 === 3) { check((await state()) === 'intro', `iteration ${i}: restart from intro`); await page.tap('.btn--restart'); await sleep(60); check((await state()) === 'start', `restart iteration ${i} -> start`); continue; }
-  await sleep(1700); await page.tap('.btn--start'); await sleep(80);
+  await sleep(1700); await page.tap(`.theme-btn[data-theme="${['food', 'beach', 'party'][i % 3]}"]`); await sleep(80);
   if (i % 3 === 1) {
     await autopilot(90000, 'item'); await sleep(1200);
     await page.tap('.btn--continue'); await sleep(300);
@@ -155,7 +159,7 @@ for (let i = 0; i < 12; i++) {
   check(await page.$eval('#fx', (e) => e.childElementCount) === 0, `iteration ${i}: fx cleared`);
   check(await page.$eval('#scene-root', (e) => e.childElementCount) === 0, `iteration ${i}: scene cleared`);
 }
-await page.tap('.btn--play'); await sleep(1700); await page.tap('.btn--start'); await sleep(100);
+await page.tap('.btn--play'); await sleep(1700); await page.tap('.theme-btn[data-theme="party"]'); await sleep(100);
 check((await state()) === 'playing' && (await dbg()).points === 0, 'points reset after restarts');
 
 // Visibility pause: hint timer and world should not advance while hidden

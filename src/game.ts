@@ -1,4 +1,4 @@
-import { DESTINATIONS, POINTS_PER_ITEM, COMPLETION_BONUS, COUPON_BONUS, type DestinationDef, type ItemId } from './data/destinations';
+import { DESTINATIONS, POINTS_PER_ITEM, COMPLETION_BONUS, COUPON_BONUS, themeOf, type DestinationDef, type ItemId, type ThemeDef, type ThemeId } from './data/destinations';
 import { ITEM_ART } from './art/items';
 import { SCENE_ART } from './art/scenes';
 import { Clock, easeInOutCubic, easeOutBack } from './lib/clock';
@@ -8,7 +8,7 @@ import { createRandom, seedFromUrl } from './lib/random';
 import { Runner, type Entity } from './scene/runner';
 import { Fx } from './fx/fx';
 import { Hud } from './ui/hud';
-import { renderStart, renderRedeem, renderJournal, renderIntro, renderFinal, showCtaConfirm, clearScreen, type Counts } from './ui/screens';
+import { renderStart, renderRedeem, renderJournal, renderIntro, renderFinal, showCtaConfirm, clearScreen, type Counts, type Chosen } from './ui/screens';
 import { MAP_POINTS, MAP_W } from './art/map';
 
 export type GameState = 'start' | 'intro' | 'playing' | 'redeem' | 'journal' | 'final';
@@ -16,15 +16,23 @@ export type GameState = 'start' | 'intro' | 'playing' | 'redeem' | 'journal' | '
 const HINT_DELAY = 4000;
 const DISCOVER_LINES: Record<ItemId, string> = {
   coconut: 'A coconut! Refreshing.',
-  football: 'Goooal! A football.',
-  seashell: 'A seashell! Pretty.',
   acai: 'Açaí bowl! Energy.',
+  brigadeiro: 'Brigadeiro! Sweet.',
+  football: 'Goooal! A football.',
   flipflop: 'A flip-flop! Beach style.',
-  azulejo: 'An azulejo tile!',
-  tram: 'A tiny tram. Ding ding!',
+  seashell: 'A seashell! Pretty.',
+  pandeiro: 'A pandeiro! Feel the beat.',
+  mask: 'A Carnival mask!',
+  apito: 'A samba whistle! Tweet!',
   nata: 'Pastel de nata. Yum!',
   francesinha: 'A francesinha! Hearty.',
+  sardine: 'A grilled sardine!',
+  azulejo: 'An azulejo tile!',
+  tram: 'A tiny tram. Ding ding!',
   rabelo: 'A rabelo boat!',
+  martelinho: 'A squeaky hammer!',
+  balloon: 'A paper balloon!',
+  manjerico: 'A basil pot! Sweet verse.',
 };
 
 /**
@@ -38,6 +46,8 @@ export class Game {
   private points = 0;
   private progress = 0;
   private counts: Counts = {};
+  private allCountsStore: Counts = {};
+  private chosen: Chosen = {};
   private completedDests: string[] = [];
   private coupons: string[] = [];
   private speedToastShown = false;
@@ -65,6 +75,7 @@ export class Game {
   }
 
   get destination(): DestinationDef { return DESTINATIONS[this.destIndex]; }
+  get theme(): ThemeDef { return themeOf(this.destination, this.chosen[this.destination.id] ?? this.destination.themes[0].id); }
 
   /** Boot (first run) and restart share exactly the same path. */
   reset() {
@@ -90,9 +101,10 @@ export class Game {
     this.points = 0;
     this.progress = 0;
     this.counts = {};
+    this.allCountsStore = {};
+    this.chosen = {};
     this.completedDests = [];
     this.coupons = [];
-    this.allCountsStore = {};
     this.speedToastShown = false;
   }
 
@@ -137,6 +149,52 @@ export class Game {
     renderStart(this.overlay, () => this.enterIntro(0), this.ac.signal);
   }
 
+  /**
+   * Level intro: the journey map with the plane flying to the destination,
+   * then a card asking which theme to explore. Choosing a theme starts the run.
+   */
+  private enterIntro(index: number) {
+    this.allCountsStore = { ...this.allCountsStore, ...this.counts };
+    this.destIndex = index;
+    this.runner?.destroy();
+    this.runner = null;
+    this.setState('intro');
+    this.app.style.setProperty('--scene-bg', '#7845D8');
+    const dest = this.destination;
+    if (!$('#hud').childElementCount) this.hud.mount(() => this.reset(), this.ac.signal);
+    this.hud.setDestination(dest, this.completedDests);
+    this.hud.setPoints(this.points);
+
+    const completed = this.completedDests.map((id) => DESTINATIONS.findIndex((d) => d.id === id));
+    const parts = renderIntro(this.overlay, dest, index, completed, (theme) => this.startLevel(index, theme), this.ac.signal);
+
+    // Plane flight along a quadratic curve in map coordinates.
+    const P2 = index === 0 ? MAP_POINTS.rio : MAP_POINTS.porto;
+    const P0 = index === 0 ? MAP_POINTS.entry : MAP_POINTS.rio;
+    const P1 = index === 0 ? MAP_POINTS.entryControl : MAP_POINTS.routeControl;
+    const duration = index === 0 ? 1500 : 2200;
+    this.clock.tween(duration, (t) => {
+      const e = easeInOutCubic(t);
+      const x = (1 - e) ** 2 * P0.x + 2 * (1 - e) * e * P1.x + e ** 2 * P2.x;
+      const y = (1 - e) ** 2 * P0.y + 2 * (1 - e) * e * P1.y + e ** 2 * P2.y;
+      const dx = 2 * (1 - e) * (P1.x - P0.x) + 2 * e * (P2.x - P1.x);
+      const dy = 2 * (1 - e) * (P1.y - P0.y) + 2 * e * (P2.y - P1.y);
+      const s = parts.map.getBoundingClientRect().width / MAP_W;
+      parts.plane.style.transform = `translate(${x * s}px, ${y * s}px) rotate(${Math.atan2(dy, dx) * 180 / Math.PI}deg)`;
+    }, () => {
+      parts.plane.classList.add('landed');
+      parts.map.querySelector('.map-marker--active')?.classList.add('arrived');
+      parts.card.classList.add('show');
+      this.clock.tween(500, (t) => { parts.card.style.transform = `translateY(${(1 - easeOutBack(t)) * 60}px)`; parts.card.style.opacity = String(Math.min(1, t * 2)); });
+    });
+  }
+
+  private startLevel(index: number, theme: ThemeId) {
+    if (this.state !== 'intro') return; // double-tap guard
+    this.chosen[this.destination.id] = theme;
+    this.enterPlaying(index);
+  }
+
   private enterPlaying(index: number) {
     this.destIndex = index;
     this.progress = 0;
@@ -147,8 +205,9 @@ export class Game {
     this.setState('playing');
 
     const dest = this.destination;
+    const theme = this.theme;
     this.app.style.setProperty('--scene-bg', SCENE_ART[dest.id].bg);
-    this.runner = new Runner(dest, {
+    this.runner = new Runner(dest, theme.items, {
       onCollect: (e, screen) => this.collect(e, screen),
       onHit: (e, screen) => this.hit(e, screen),
     }, this.random, this.ac.signal, this.stage);
@@ -156,10 +215,11 @@ export class Game {
 
     if (!$('#hud').childElementCount) this.hud.mount(() => this.reset(), this.ac.signal);
     this.hud.setDestination(dest, this.completedDests);
+    this.hud.setTheme(theme);
     this.hud.setPoints(this.points);
-    const couponItem = dest.items.find((i) => i.id === dest.coupon.itemId)!;
+    const couponItem = theme.items.find((i) => i.id === theme.coupon.itemId)!;
     this.say(index === 0 ? 'Move up and down to catch items!' : `${dest.name}! Faster this time.`, 2400);
-    this.clock.after(2600, () => this.say(`Catch ${dest.coupon.need} ${couponItem.label.toLowerCase()}s for a coupon!`, 2600));
+    this.clock.after(2600, () => this.say(`Catch ${theme.coupon.need} ${couponItem.label.toLowerCase()}s for a coupon!`, 2600));
     this.armHint();
   }
 
@@ -167,28 +227,29 @@ export class Game {
     if (this.state !== 'playing') return;
     const id = e.id as ItemId;
     const dest = this.destination;
+    const theme = this.theme;
     const first = !this.counts[id];
     const count = (this.counts[id] = (this.counts[id] ?? 0) + 1);
     this.progress = Math.min(dest.level.goal, this.progress + 1);
     this.armHint();
 
-    const isCouponItem = id === dest.coupon.itemId;
-    const couponJustUnlocked = isCouponItem && count === dest.coupon.need;
+    const isCouponItem = id === theme.coupon.itemId;
+    const couponJustUnlocked = isCouponItem && count === theme.coupon.need;
 
     this.fx.burst(screen.x, screen.y, dest.accent, 8);
     this.fx.floatText(screen.x, screen.y - 14, `+${POINTS_PER_ITEM}`);
     const to = first || isCouponItem ? this.hud.chipPoint(id) : this.hud.barPoint();
     this.fx.fly(screen, to, ITEM_ART[id](), () => {
-      this.hud.setCount(id, count, isCouponItem ? dest.coupon.need : undefined, isCouponItem && count >= dest.coupon.need);
+      this.hud.setCount(id, count, isCouponItem ? theme.coupon.need : undefined, isCouponItem && count >= theme.coupon.need);
       this.hud.setProgress(this.progress, dest.level.goal, 'up');
       this.addPoints(POINTS_PER_ITEM);
     });
     if (couponJustUnlocked) {
-      this.coupons.push(dest.coupon.id);
+      this.coupons.push(`${dest.id}:${theme.id}`);
       this.addPoints(COUPON_BONUS);
       this.hud.toast('Coupon unlocked!', 'toast--coupon');
       this.fx.confetti(18);
-      this.say(`${dest.coupon.title} coupon — yours!`, 2000);
+      this.say(`${theme.coupon.title} — yours!`, 2000);
     } else if (first) {
       this.say(DISCOVER_LINES[id], 1600);
     }
@@ -216,76 +277,32 @@ export class Game {
     this.setState('redeem');
     this.clock.cancel(this.hintTimer);
     const dest = this.destination;
+    const theme = this.theme;
     this.completedDests.push(dest.id);
     this.runner?.finish();
     this.runner?.say(`${dest.shortName} complete!`);
+    this.hud.toast('Passport stamped!', 'toast--done');
     this.fx.confetti();
     this.hud.setDestination(dest, this.completedDests);
-    for (const it of dest.items) {
-      const isCoupon = it.id === dest.coupon.itemId;
-      if (this.counts[it.id]) this.hud.setCount(it.id, this.counts[it.id]!, isCoupon ? dest.coupon.need : undefined, isCoupon && this.coupons.includes(dest.coupon.id));
+    this.hud.setTheme(theme);
+    const couponUnlocked = this.coupons.includes(`${dest.id}:${theme.id}`);
+    for (const it of theme.items) {
+      const isCoupon = it.id === theme.coupon.itemId;
+      if (this.counts[it.id]) this.hud.setCount(it.id, this.counts[it.id]!, isCoupon ? theme.coupon.need : undefined, isCoupon && couponUnlocked);
     }
     this.hud.setProgress(dest.level.goal, dest.level.goal);
     const isLast = this.destIndex === DESTINATIONS.length - 1;
-    const couponUnlocked = this.coupons.includes(dest.coupon.id);
     this.clock.after(900, () => {
       this.addPoints(COMPLETION_BONUS);
-      renderRedeem(this.overlay, dest, this.points, this.counts, couponUnlocked, () => {
+      renderRedeem(this.overlay, dest, theme, this.points, this.counts, couponUnlocked, () => {
         if (this.state !== 'redeem') return; // double-tap guard
         this.setState('journal');
-        renderJournal(this.overlay, dest, this.counts, isLast, () => {
+        renderJournal(this.overlay, dest, theme, this.counts, isLast, () => {
           if (this.state !== 'journal') return;
           if (isLast) this.enterFinal(); else this.enterIntro(this.destIndex + 1);
         }, this.ac.signal);
       }, this.ac.signal);
     });
-  }
-
-  /**
-   * Level intro: the journey map with the plane flying to the destination,
-   * then a stage card (items, coupon, obstacles). Starts on tap or automatically.
-   */
-  private enterIntro(index: number) {
-    this.allCountsStore = { ...this.allCountsStore, ...this.counts };
-    this.destIndex = index;
-    this.runner?.destroy();
-    this.runner = null;
-    this.setState('intro');
-    this.app.style.setProperty('--scene-bg', '#7845D8');
-    const dest = this.destination;
-    if (!$('#hud').childElementCount) this.hud.mount(() => this.reset(), this.ac.signal);
-    this.hud.setDestination(dest, this.completedDests);
-    this.hud.setPoints(this.points);
-
-    const completed = this.completedDests.map((id) => DESTINATIONS.findIndex((d) => d.id === id));
-    const parts = renderIntro(this.overlay, dest, index, completed, () => this.startLevel(index), this.ac.signal);
-
-    // Plane flight along a quadratic curve in map coordinates.
-    const P2 = index === 0 ? MAP_POINTS.rio : MAP_POINTS.porto;
-    const P0 = index === 0 ? MAP_POINTS.entry : MAP_POINTS.rio;
-    const P1 = index === 0 ? MAP_POINTS.entryControl : MAP_POINTS.routeControl;
-    const duration = index === 0 ? 1500 : 2200;
-    this.clock.tween(duration, (t) => {
-      const e = easeInOutCubic(t);
-      const x = (1 - e) ** 2 * P0.x + 2 * (1 - e) * e * P1.x + e ** 2 * P2.x;
-      const y = (1 - e) ** 2 * P0.y + 2 * (1 - e) * e * P1.y + e ** 2 * P2.y;
-      const dx = 2 * (1 - e) * (P1.x - P0.x) + 2 * e * (P2.x - P1.x);
-      const dy = 2 * (1 - e) * (P1.y - P0.y) + 2 * e * (P2.y - P1.y);
-      const s = parts.map.getBoundingClientRect().width / MAP_W;
-      parts.plane.style.transform = `translate(${x * s}px, ${y * s}px) rotate(${Math.atan2(dy, dx) * 180 / Math.PI}deg)`;
-    }, () => {
-      parts.plane.classList.add('landed');
-      parts.map.querySelector('.map-marker--active')?.classList.add('arrived');
-      parts.card.classList.add('show');
-      this.clock.tween(500, (t) => { parts.card.style.transform = `translateY(${(1 - easeOutBack(t)) * 60}px)`; parts.card.style.opacity = String(Math.min(1, t * 2)); });
-      // Auto-start after a short read time; the bar under the button shows the countdown.
-      this.clock.tween(4500, (t) => { parts.auto.style.width = `${t * 100}%`; }, () => this.startLevel(index));
-    });
-  }
-
-  private startLevel(index: number) {
-    if (this.state !== 'intro') return; // tap + auto-start guard
-    this.enterPlaying(index);
   }
 
   private enterFinal() {
@@ -294,13 +311,10 @@ export class Game {
     this.runner = null;
     this.hud.unmount();
     this.app.style.setProperty('--scene-bg', '#201338');
-    // Merge counts of both destinations for the passport pages (item ids are unique per destination).
-    renderFinal(this.overlay, this.points, this.allCounts, this.coupons, () => this.onCta(), () => this.reset(), this.ac.signal);
+    const allCounts: Counts = { ...this.allCountsStore, ...this.counts };
+    renderFinal(this.overlay, this.points, allCounts, this.chosen, this.coupons, () => this.onCta(), () => this.reset(), this.ac.signal);
     this.fx.confetti(36);
   }
-
-  private allCountsStore: Counts = {};
-  private get allCounts(): Counts { return { ...this.allCountsStore, ...this.counts }; }
 
   private onCta() {
     console.log('[Passport Quest] CTA clicked — demo only (no navigation)');
@@ -342,6 +356,7 @@ export class Game {
       points: this.points,
       progress: this.progress,
       counts: this.counts,
+      chosen: this.chosen,
       coupons: this.coupons,
       entities: this.runner?.liveEntities() ?? [],
       fox: this.runner?.foxPosition ?? null,

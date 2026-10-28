@@ -1,4 +1,4 @@
-import type { DestinationDef, ItemId, ObstacleId } from '../data/destinations';
+import type { DestinationDef, ItemDef, ItemId, ObstacleId } from '../data/destinations';
 import { ITEM_ART, OBSTACLE_ART } from '../art/items';
 import { SCENE_ART, type ParallaxLayer } from '../art/scenes';
 import { foxGroup, type FoxMood } from '../art/fox';
@@ -55,6 +55,8 @@ export class Runner {
 
   constructor(
     private dest: DestinationDef,
+    /** Collectibles for this run (the chosen theme's items). */
+    private items: ItemDef[],
     private handlers: RunnerHandlers,
     private random: () => number,
     signal: AbortSignal,
@@ -71,7 +73,7 @@ export class Runner {
         <g class="backdrop">${art.backdrop}</g>
         ${art.layers.map((l) => layerMarkup(l, 'layer-back')).join('')}
         <g class="entities"></g>
-        <g class="fox-root"><g class="fox-inner">${foxGroup('run')}</g></g>
+        <g class="fox-root"><ellipse class="fox-shadow" cy="46" rx="40" ry="8" fill="#201338" opacity="0.18"/><g class="fox-inner">${foxGroup('run')}</g></g>
         ${art.front.map((l) => layerMarkup(l, 'layer-front')).join('')}
         <g class="bubble" visibility="hidden"><rect class="bubble-bg" rx="10"/><text class="bubble-text" text-anchor="start"></text></g>
         <g class="hint-hand" visibility="hidden">
@@ -133,7 +135,7 @@ export class Runner {
   }
 
   private placeFox() {
-    this.foxG.setAttribute('transform', `translate(${FOX_X} ${this.foxY}) scale(${this.depthScale(this.foxY) * 0.52})`);
+    this.foxG.setAttribute('transform', `translate(${FOX_X} ${this.foxY}) scale(${this.depthScale(this.foxY) * 0.6})`);
     this.bubbleG.setAttribute('transform', `translate(${FOX_X - 34} ${this.foxY - 58})`);
     this.hintG.setAttribute('transform', `translate(${FOX_X + 70} ${this.foxY})`);
   }
@@ -198,7 +200,8 @@ export class Runner {
   }
 
   private spawn() {
-    const { level, items, obstacles } = this.dest;
+    const { level, obstacles } = this.dest;
+    const items = this.items;
     const { band } = SCENE_ART[this.dest.id];
     const obstacleChance = lerp(level.obstacleStart, level.obstacleEnd, this.progressRamp);
     const y = band.top + this.random() * (band.bottom - band.top);
