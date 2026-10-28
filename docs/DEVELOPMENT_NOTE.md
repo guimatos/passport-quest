@@ -80,6 +80,21 @@ URLs. The production build is about 224 KB on disk.
   were fixed at three per city with three items each.
 - No Lisbon or third city; no leaderboard; no localisation.
 
+## Performance measurements
+
+Measured with `node scripts/perfcheck.mjs` (headless Chrome, 320×568 @2x, Rio
+Party at night, the busiest scene; CPU throttled 6x through the DevTools
+protocol; 15 s of autopilot play). "Main thread" columns are the renderer's
+cumulative task / style-recalc / layout durations over the window, read from
+`Performance.getMetrics`; "busy" is task time divided by wall time. Frame
+rate stays vsync-bound at 60 fps in every build, so the main-thread columns
+are the ones that move. Runs vary by about ±10%; each row is the median of
+three runs. `?perf=1` shows the live overlay in any build.
+
+| Build | fps avg | frame worst ms | JS/frame avg ms | main thread busy % | task ms | style ms | layout ms | SVG nodes | heap MB |
+|---|---|---|---|---|---|---|---|---|---|
+| Stage 1 baseline (before Stage 2 work) | 60 | 24 | 0.52 | 48.5 | 7278 | 1468 | 351 | 876 | 3 |
+
 ## AI correction / rejected output — written by developer
 
 _To be filled in by the developer._

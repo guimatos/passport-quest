@@ -11,6 +11,7 @@ import { Hud } from './ui/hud';
 import { renderStart, renderRedeem, renderJournal, renderIntro, markIntroDestination, renderThemeCard, renderFinal, showCtaConfirm, clearScreen, type Counts, type Chosen } from './ui/screens';
 import { Music } from './audio/music';
 import { MAP_POINTS, MAP_W } from './art/map';
+import { PerfOverlay } from './lib/perf';
 
 export type GameState = 'start' | 'intro' | 'playing' | 'redeem' | 'journal' | 'final';
 
@@ -63,6 +64,8 @@ export class Game {
   private random = createRandom(1);
   private hintTimer: number | undefined;
   private bubbleTimer: number | undefined;
+  /** Dev overlay from ?perf=1; survives reset() on purpose (URL flag, not game state). */
+  private perf: PerfOverlay | null = null;
 
   private readonly app = $('#app');
   private readonly stage = $('#stage');
@@ -74,6 +77,7 @@ export class Game {
     this.loop = new Loop((dt) => this.frame(dt), (paused) => this.app.classList.toggle('paused', paused));
     this.fx = new Fx($('#fx'), this.clock);
     this.hud = new Hud($('#hud'));
+    if (new URLSearchParams(location.search).has('perf')) this.perf = new PerfOverlay(this.stage, this.sceneRoot);
   }
 
   get destination(): DestinationDef { return DESTINATIONS[this.destIndex]; }
@@ -132,6 +136,7 @@ export class Game {
   }
 
   private frame(dt: number) {
+    this.perf?.tick();
     this.clock.tick(dt);
     if (this.runner && (this.state === 'playing' || this.state === 'redeem' || this.state === 'journal')) {
       this.runner.update(dt);
@@ -140,6 +145,7 @@ export class Game {
         this.hud.toast('Faster!', 'toast--speed');
       }
     }
+    this.perf?.end();
   }
 
   // ---------- states ----------
@@ -402,6 +408,7 @@ export class Game {
       entities: this.runner?.liveEntities() ?? [],
       fox: this.runner?.foxPosition ?? null,
       toScreen: (x: number, y: number) => this.runner?.toScreen(x, y) ?? null,
+      perf: this.perf?.sample ?? null,
     };
   }
 }
