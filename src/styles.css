@@ -407,27 +407,33 @@ body {
 .hud-toast.toast--speed { color: #FFD966; }
 @keyframes toast-in { 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 70% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -70%) scale(1); } }
 
-/* ---------- runner scene: fox run cycle ---------- */
+/* ---------- runner scene: Capi run cycle (upright) ---------- */
 .runner-root { will-change: transform; }
-.runner-root .runner-body { animation: fox-run 0.4s ease-in-out infinite; transform-origin: 0 10px; }
-@keyframes fox-run { 50% { transform: translateY(-5px) rotate(-4deg); } }
-.runner-root .runner-head { animation: fox-head 0.4s ease-in-out infinite; transform-origin: 20px -10px; }
-@keyframes fox-head { 50% { transform: translateY(2px) rotate(3deg); } }
-.runner-root .fox-tail { animation: fox-tail 0.4s ease-in-out infinite; transform-origin: -30px 6px; }
-@keyframes fox-tail { 50% { transform: rotate(14deg); } }
-.runner-root .leg { animation: leg-cycle 0.4s linear infinite; }
-.runner-root .leg-back-a { transform-origin: -6px 18px; animation-delay: 0s; }
-.runner-root .leg-front-a { transform-origin: 24px 18px; animation-delay: -0.2s; }
-.runner-root .leg-back-b { transform-origin: -14px 16px; animation-delay: -0.2s; }
-.runner-root .leg-front-b { transform-origin: 16px 16px; animation-delay: 0s; }
-@keyframes leg-cycle { 0% { transform: rotate(-38deg); } 50% { transform: rotate(38deg); } 100% { transform: rotate(-38deg); } }
+.runner-root .runner-body { animation: body-bob 0.4s ease-in-out infinite; transform-origin: 0 24px; }
+@keyframes body-bob { 50% { transform: translateY(-4px) rotate(4deg); } }
+.runner-root .runner-head { animation: head-bob 0.4s ease-in-out infinite; transform-origin: 10px -14px; }
+@keyframes head-bob { 50% { transform: rotate(-4deg); } }
+.runner-root .r-leg { animation: leg-cycle 0.4s linear infinite; transform-origin: 0 24px; }
+.runner-root .r-leg-a { animation-delay: 0s; }
+.runner-root .r-leg-b { animation-delay: -0.2s; }
+@keyframes leg-cycle { 0% { transform: rotate(-42deg); } 50% { transform: rotate(42deg); } 100% { transform: rotate(-42deg); } }
+.runner-root .r-arm { animation: arm-cycle 0.4s linear infinite; transform-origin: 2px -6px; }
+.runner-root .r-arm-a { animation-delay: -0.2s; }
+.runner-root .r-arm-b { animation-delay: 0s; }
+@keyframes arm-cycle { 0% { transform: rotate(-30deg); } 50% { transform: rotate(34deg); } 100% { transform: rotate(-30deg); } }
 .runner-root.stunned .runner-inner { animation: fox-stun 0.7s linear; }
 @keyframes fox-stun { 0%, 100% { opacity: 1; } 20%, 60% { opacity: 0.35; } 40%, 80% { opacity: 1; } }
-.runner-root.finished .runner-body { animation: fox-cheer 0.5s ease-in-out infinite; }
-.runner-root.finished .leg { animation: none; }
-@keyframes fox-cheer { 50% { transform: translateY(-18px) rotate(-8deg); } }
+.runner-root.finished .runner-body { animation: capy-cheer 0.5s ease-in-out infinite; }
+.runner-root.finished .r-leg { animation: none; }
+.runner-root.finished .r-arm { animation: arm-up 0.5s ease-in-out infinite; }
+@keyframes capy-cheer { 50% { transform: translateY(-20px) rotate(-6deg); } }
+@keyframes arm-up { 0%, 100% { transform: rotate(-120deg); } 50% { transform: rotate(-150deg); } }
 .runner-root .runner-shadow { transform-origin: 0 0; animation: shadow-pulse 0.4s ease-in-out infinite; }
 @keyframes shadow-pulse { 50% { transform: scale(0.85); opacity: 0.25; } }
+
+/* Screen portraits: waving arm */
+.p-arm.wave { animation: wave 1.2s ease-in-out infinite; transform-origin: 34px 44px; }
+@keyframes wave { 50% { transform: rotate(-18deg); } }
 
 /* ---------- ambient scene motion (all CSS, paused with the game) ---------- */
 .waves { animation: waves 2.6s ease-in-out infinite; }
@@ -762,4 +768,89 @@ g:nth-child(3n) > .bulb { animation-delay: -1.1s; }
   .theme-items svg { width: 18px; height: 18px; }
   .hud-fox-avatar { width: 50px; height: 56px; }
   .hud-bubble { font-size: 12px; max-width: 180px; }
+}
+
+/* ---------- map hub: destination choice ---------- */
+.dest-list { display: flex; gap: 8px; width: min(100%, 300px); margin-top: 4px; }
+.dest-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: var(--cream); color: var(--ink); border: 0; border-radius: 14px; padding: 8px 6px;
+  font: inherit; cursor: pointer; min-height: 56px; touch-action: manipulation;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.25); transition: transform 0.12s ease;
+}
+.dest-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.25); }
+.dest-btn strong { font-size: 15px; }
+.dest-btn span { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--purple); font-weight: 700; }
+.dest-btn--done { opacity: 0.55; pointer-events: none; }
+.dest-btn--done strong::after { content: ' ✓'; color: #1FA463; }
+.map-marker--pick { cursor: pointer; }
+.map-marker--pick .map-marker-ring { opacity: 1; animation: marker-ping 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.map-marker--pick .map-marker-dot { fill: var(--orange); }
+.intro-where { font-size: 15px; font-weight: 700; margin-top: 6px; }
+.screen--intro .card.intro-card.hidden { display: none; }
+
+/* ---------- mute button ---------- */
+.btn--mute { min-width: 40px; padding: 0 6px; margin-left: 2px; }
+.btn--mute .icon-on, .btn--mute .icon-off { width: 20px; height: 20px; }
+.btn--mute[aria-pressed="true"] .icon-on, .btn--mute:not([aria-pressed="true"]) .icon-off { display: none; }
+@media (max-width: 349px) { .btn--restart span { display: none; } .btn--restart { padding: 0 8px; } }
+
+/* ---------- email mock on the final screen ---------- */
+.email-form { display: flex; gap: 6px; width: min(100%, 300px); margin-top: 8px; }
+.email-input {
+  flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 0 12px; min-height: 44px;
+  border-radius: 999px; border: 2px solid rgba(255,246,232,0.35); background: rgba(255,246,232,0.1); color: var(--cream);
+  user-select: text; -webkit-user-select: text; touch-action: manipulation; outline: none;
+}
+.email-input::placeholder { color: rgba(255,246,232,0.55); }
+.email-input:focus { border-color: var(--orange); }
+.email-input.invalid { border-color: #E0533B; animation: bar-down 0.45s ease; }
+.btn--send { background: var(--purple); padding: 0 14px; font-size: 14px; min-height: 44px; box-shadow: 0 3px 0 #5a2fb0; }
+.email-note { font-size: 10px; opacity: 0.7; margin-top: 4px; }
+.email-confirm { min-height: 18px; font-size: 13px; font-weight: 700; color: #FFD966; margin-top: 4px; }
+.screen--final .btn--cta { margin-top: 8px; }
+@media (max-height: 600px) {
+  .screen--final .final-message { display: none; }
+  .screen--final .passport-open { margin-top: 4px; }
+  .email-input, .btn--send { min-height: 40px; }
+  .screen--final .btn--cta { margin-top: 4px; min-height: 44px; }
+  .final-duo .start-capy { width: 56px; height: 82px; }
+  .final-duo .start-fox { width: 40px; height: 52px; }
+}
+/* The plane is positioned by JS; keep it hidden until the first flight frame. */
+.travel-plane { opacity: 0; }
+.travel-plane[style] { opacity: 1; }
+
+/* Final screen compaction so passport + wallet + email mock + CTA fit 320x568. */
+.screen--final { gap: 4px; }
+.final-wallet { gap: 2px; padding: 6px 12px; }
+.final-wallet-row { gap: 6px; }
+.final-wallet strong { font-size: 18px; }
+.final-coupons { font-size: 11px; }
+.screen--final .demo-note { margin-top: 2px; }
+.email-form { margin-top: 4px; }
+.email-confirm { margin-top: 2px; }
+@media (max-height: 600px) {
+  .screen--final { gap: 2px; padding-top: 8px; padding-bottom: 8px; }
+  .screen--final .eyebrow { display: none; }
+  .screen--final h2 { font-size: 20px; }
+  .final-duo { margin-bottom: 0; }
+  .final-duo .start-capy { width: 52px; height: 76px; }
+  .final-duo .start-fox { width: 38px; height: 50px; }
+  .passport-open { padding: 6px; gap: 4px; }
+  .passport-page { padding: 3px 2px; gap: 1px; }
+  .stamp--final { width: 46px; height: 46px; }
+  .passport-items svg { width: 18px; height: 18px; }
+  .passport-page-title { font-size: 10px; }
+  .final-wallet { padding: 4px 10px; margin-top: 4px; }
+  .final-wallet strong { font-size: 16px; }
+  .final-wallet .wallet-coin { width: 18px; height: 18px; }
+  .screen--final .demo-note { font-size: 9.5px; margin-top: 1px; }
+  .email-input, .btn--send { min-height: 36px; font-size: 13px; }
+  .btn--send { padding: 0 10px; }
+  .email-note { font-size: 9.5px; margin-top: 2px; }
+  .email-confirm { font-size: 11px; min-height: 14px; margin-top: 1px; }
+  .screen--final .btn--cta { min-height: 42px; font-size: 18px; margin-top: 3px; }
+  .cta-confirm { min-height: 16px; font-size: 12px; margin-top: 2px; }
+  .btn--restart-final { min-height: 34px; font-size: 14px; margin-top: 0; }
 }

@@ -18,12 +18,16 @@ export class Hud {
 
   constructor(private root: HTMLElement) {}
 
-  mount(onRestart: () => void, signal: AbortSignal) {
+  mount(onRestart: () => void, onToggleMute: () => boolean, muted: boolean, signal: AbortSignal) {
     this.root.innerHTML = `
       <div class="hud-top">
         <button class="btn btn--icon btn--restart" type="button" aria-label="Restart game" title="Restart">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.3 4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M5 3v6h6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>Restart</span>
+        </button>
+        <button class="btn btn--icon btn--mute" type="button" aria-label="Mute music" aria-pressed="${muted}" title="Music on/off">
+          <svg class="icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <svg class="icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
         <div class="hud-place">
           <strong class="hud-place-name"></strong>
@@ -54,6 +58,8 @@ export class Hud {
     this.barFill = $('.passport-bar-fill', this.root);
     this.barText = $('.passport-bar-text', this.root);
     $('.btn--restart', this.root).addEventListener('click', onRestart, { signal });
+    const mute = $('.btn--mute', this.root);
+    mute.addEventListener('click', () => { mute.setAttribute('aria-pressed', String(onToggleMute())); }, { signal });
   }
 
   /** Shows the destination header and trip dots; chips are set by setTheme once the theme is chosen. */

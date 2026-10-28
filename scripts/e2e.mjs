@@ -57,9 +57,14 @@ await shot('01-start');
 check((await state()) === 'start', 'starts on start screen');
 await page.tap('.btn--play');
 await sleep(200);
-check((await state()) === 'intro', 'play enters the level intro');
-await sleep(1800); await shot('01b-intro');
+check((await state()) === 'intro', 'play enters the map hub');
+await sleep(400); await shot('01a-map');
+check((await page.$$('.dest-btn')).length === 2, 'map offers both destinations');
+await page.tap('.dest-btn[data-dest="brazil"]');
+await page.tap('.dest-btn[data-dest="portugal"]').catch(() => {});
+await sleep(1900); await shot('01b-intro');
 check(await page.$eval('.intro-card', (e) => e.classList.contains('show')), 'intro card shown after the plane lands');
+check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Rio')), 'first pick (Rio) wins over the second tap');
 check((await page.$$('.theme-btn')).length === 3, 'intro offers 3 themes');
 await page.tap('.theme-btn[data-theme="food"]');
 await page.tap('.theme-btn[data-theme="party"]').catch(() => {});
@@ -109,9 +114,10 @@ check((await page.$$('.journal-row')).length === 3, 'journal lists the 3 themed 
 check((await dbg()).entities.every((e) => e.kind === 'obstacle' || ['coconut', 'acai', 'brigadeiro'].includes(e.id)), 'only food-theme items spawned in Rio');
 await page.tap('.btn--continue');
 await sleep(200);
-check((await state()) === 'intro', 'journal continue enters the Porto intro');
-await sleep(2600); await shot('05-intro-porto');
+check((await state()) === 'intro', 'journal continue returns to the map');
+await sleep(3400); await shot('05-intro-porto');
 check(await page.$$eval('.map-marker--done', (els) => els.length) === 1, 'map shows Rio as done');
+check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Porto')), 'remaining destination auto-selected (Porto)');
 await page.tap('.theme-btn[data-theme="party"]'); await sleep(200);
 check((await state()) === 'playing' && (await dbg()).chosen.portugal === 'party', 'Porto theme chosen (party)');
 check(await page.$eval('.hud-place-name', (e) => e.textContent) === 'Porto', 'HUD shows Porto');
@@ -132,6 +138,17 @@ check(logs.some((l) => l.includes('CTA clicked')), 'CTA console.log');
 check(await page.$eval('.cta-confirm', (e) => e.textContent) === 'CTA clicked — demo only', 'CTA confirmation text');
 check(page.url() === url, 'CTA did not navigate');
 
+// Email mock
+await page.type('.email-input', 'not-an-email');
+await page.tap('.btn--send'); await sleep(100);
+check(await page.$eval('.email-input', (e) => e.classList.contains('invalid')), 'invalid email rejected');
+await page.$eval('.email-input', (e) => { e.value = ''; });
+await page.type('.email-input', 'test@example.com');
+await page.tap('.btn--send'); await sleep(150);
+check((await page.$eval('.email-confirm', (e) => e.textContent)).includes('test@example.com'), 'mock send confirmation shown');
+check(logs.some((l) => l.includes('mock') && l.includes('coupons')), 'mock send logged, nothing sent');
+check(requests.filter((u) => !u.startsWith(new URL(url).origin)).length === 0, 'no network request from the email mock');
+await shot('07b-email');
 // Restart from final
 await page.tap('.btn--restart-final');
 await sleep(200);
@@ -140,8 +157,10 @@ check((await state()) === 'start', 'restart from final -> start');
 // Repeated restarts from various states, including mid-intro, mid-redeem and mid-journal
 for (let i = 0; i < 12; i++) {
   await page.tap('.btn--play'); await sleep(80);
+  if (i % 4 === 2) { await page.tap('.dest-btn[data-dest="portugal"]'); await sleep(2200); check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Porto')), `iteration ${i}: Porto chosen first`); await page.tap('.btn--restart'); await sleep(60); check((await state()) === 'start', `restart iteration ${i} -> start`); continue; }
+  await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(50);
   if (i % 4 === 3) { check((await state()) === 'intro', `iteration ${i}: restart from intro`); await page.tap('.btn--restart'); await sleep(60); check((await state()) === 'start', `restart iteration ${i} -> start`); continue; }
-  await sleep(1700); await page.tap(`.theme-btn[data-theme="${['food', 'party', 'culture'][i % 3]}"]`); await sleep(80);
+  await sleep(1750); await page.tap(`.theme-btn[data-theme="${['food', 'party', 'culture'][i % 3]}"]`); await sleep(80);
   if (i % 3 === 1) {
     await autopilot(90000, 'item'); await sleep(1200);
     await page.tap('.btn--continue'); await sleep(300);
@@ -159,7 +178,7 @@ for (let i = 0; i < 12; i++) {
   check(await page.$eval('#fx', (e) => e.childElementCount) === 0, `iteration ${i}: fx cleared`);
   check(await page.$eval('#scene-root', (e) => e.childElementCount) === 0, `iteration ${i}: scene cleared`);
 }
-await page.tap('.btn--play'); await sleep(1700); await page.tap('.theme-btn[data-theme="party"]'); await sleep(100);
+await page.tap('.btn--play'); await sleep(100); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="party"]'); await sleep(100);
 check((await state()) === 'playing' && (await dbg()).points === 0, 'points reset after restarts');
 
 // Visibility pause: hint timer and world should not advance while hidden

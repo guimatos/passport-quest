@@ -15,14 +15,14 @@ await page.evaluate(() => {
       if (ahead.length) { const p = d.toScreen(0, ahead[0].y); stage.dispatchEvent(new PointerEvent('pointermove', { clientX: 100, clientY: p.y, isPrimary: true, pointerType: 'mouse', bubbles: true })); }
       requestAnimationFrame(step); }; step(); });
 });
-await page.tap('.btn--play'); await sleep(1800); await page.screenshot({ path: `${out}/intro-rio.png` }); await page.tap(`.theme-btn[data-theme="${RIO}"]`); await sleep(3000);
+await page.tap('.btn--play'); await sleep(500); await page.screenshot({ path: `${out}/map-hub.png` }); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1900); await page.screenshot({ path: `${out}/intro-rio.png` }); await page.tap(`.theme-btn[data-theme="${RIO}"]`); await sleep(3000);
 await page.evaluate(() => window.__autopilot(2500));
 await page.screenshot({ path: `${out}/play-rio-${RIO}-a.png` });
 await page.evaluate(() => window.__autopilot(1200));
 await page.screenshot({ path: `${out}/play-rio-${RIO}-b.png` });
 await page.evaluate(() => window.__autopilot(60000));
 await sleep(600); await page.screenshot({ path: `${out}/play-rio-done.png` });
-await sleep(1200); await page.tap('.btn--continue'); await sleep(300); await page.tap('.btn--continue'); await sleep(2800); await page.screenshot({ path: `${out}/intro-porto.png` }); await page.tap(`.theme-btn[data-theme="${PORTO}"]`); await sleep(3200);
+await sleep(1200); await page.tap('.btn--continue'); await sleep(300); await page.tap('.btn--continue'); await sleep(3600); await page.screenshot({ path: `${out}/intro-porto.png` }); await page.tap(`.theme-btn[data-theme="${PORTO}"]`); await sleep(3200);
 await page.evaluate(() => window.__autopilot(2500));
 await page.screenshot({ path: `${out}/play-porto-${PORTO}-a.png` });
 await page.evaluate(() => window.__autopilot(6000));

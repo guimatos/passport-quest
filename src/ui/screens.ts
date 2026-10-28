@@ -32,7 +32,7 @@ export function renderStart(root: HTMLElement, onPlay: () => void, signal: Abort
         <div class="passport-cover"><span>PASSPORT</span></div>
       </div>
       <h1 class="title">Passport<span>Quest</span></h1>
-      <p class="hook">Capi the capybara runs from Brazil to Portugal. The Scrambly fox guides the way: pick what to see, catch it, fill your passport.</p>
+      <p class="hook">Run Rio and Porto with Capi and the Scrambly fox. Pick what to see, catch it, fill your passport.</p>
       <ol class="loop-strip" aria-label="How it works">
         <li><b>1</b><span>Discover</span><small>pick a theme</small></li>
         <li><b>2</b><span>Play</span><small>catch &amp; earn</small></li>
@@ -46,18 +46,54 @@ export function renderStart(root: HTMLElement, onPlay: () => void, signal: Abort
   $('.btn--play', root).addEventListener('click', onPlay, { signal });
 }
 
-export interface IntroParts { plane: HTMLElement; card: HTMLElement; map: SVGSVGElement }
+export interface IntroParts { plane: HTMLElement; card: HTMLElement; map: SVGSVGElement; where: HTMLElement; destList: HTMLElement }
 
-/** Journey map, then a card asking which theme to explore in this city. */
-export function renderIntro(root: HTMLElement, dest: DestinationDef, index: number, completed: number[], onChoose: (theme: ThemeId) => void, signal: AbortSignal): IntroParts {
+/**
+ * Journey map hub. With `choosing`, the map asks where to go next (markers and
+ * buttons are tappable). Otherwise the plane flies to `index` and the theme
+ * card for that destination is shown.
+ */
+export function renderIntro(
+  root: HTMLElement,
+  completed: number[],
+  onPickDestination: (index: number) => void,
+  signal: AbortSignal,
+): IntroParts {
+  const n = completed.length;
   root.innerHTML = `
     <section class="screen screen--intro">
-      <p class="eyebrow intro-eyebrow">Destination ${index + 1} of ${DESTINATIONS.length}</p>
+      <p class="eyebrow intro-eyebrow">${n === 0 ? 'Your trip' : `${n} of ${DESTINATIONS.length} stamped`}</p>
       <div class="map">
-        ${mapSvg(index, completed)}
+        ${mapSvg(-1, completed, true)}
         <div class="travel-plane">${PLANE_SVG}</div>
       </div>
-      <div class="card intro-card">
+      <p class="intro-where">${n === 0 ? 'Where do you want to go first?' : 'Next stop?'}</p>
+      <div class="dest-list">
+        ${DESTINATIONS.map((d, i) => `<button class="dest-btn ${completed.includes(i) ? 'dest-btn--done' : ''}" type="button" data-dest="${d.id}" data-index="${i}"><strong>${d.name}</strong><span>${d.country}</span></button>`).join('')}
+      </div>
+      <div class="card intro-card hidden"></div>
+    </section>`;
+  const pick = (i: number) => { if (!completed.includes(i)) onPickDestination(i); };
+  root.querySelectorAll<HTMLButtonElement>('.dest-btn').forEach((b) => b.addEventListener('click', () => pick(Number(b.dataset.index)), { signal }));
+  root.querySelectorAll<SVGGElement>('.map-marker--pick').forEach((m) => m.addEventListener('click', () => pick(Number(m.dataset.index)), { signal }));
+  return { plane: $('.travel-plane', root), card: $('.intro-card', root), map: $('.map-svg', root), where: $('.intro-where', root), destList: $('.dest-list', root) };
+}
+
+/** Marks the chosen destination on the map and hides the choice UI while the plane flies. */
+export function markIntroDestination(parts: IntroParts, index: number) {
+  parts.where.textContent = `Flying to ${DESTINATIONS[index].name}…`;
+  parts.destList.hidden = true;
+  parts.map.querySelectorAll('.map-marker').forEach((m) => {
+    m.classList.remove('map-marker--pick', 'map-marker--locked', 'map-marker--active');
+    m.classList.add(Number((m as SVGGElement).dataset.index) === index ? 'map-marker--active' : m.classList.contains('map-marker--done') ? 'map-marker--done' : 'map-marker--locked');
+  });
+}
+
+/** Fills the theme card for a destination (called once the plane has landed). */
+export function renderThemeCard(parts: IntroParts, dest: DestinationDef, onChoose: (theme: ThemeId) => void, signal: AbortSignal) {
+  parts.where.hidden = true;
+  parts.card.classList.remove('hidden');
+  parts.card.innerHTML = `
         <h2>${dest.name}<span>${dest.country}</span></h2>
         <p class="intro-question">What do you want to see here?</p>
         <div class="theme-list">
@@ -72,11 +108,8 @@ export function renderIntro(root: HTMLElement, dest: DestinationDef, index: numb
               <div class="theme-side">${themeIcon(t.id)}<div class="theme-items">${t.items.map((it) => `<svg viewBox="-28 -28 56 56" aria-hidden="true">${ITEM_ART[it.id]()}</svg>`).join('')}</div></div>
             </button>`).join('')}
         </div>
-        <div class="intro-avoid"><span class="intro-label">Avoid</span>${dest.obstacles.map((o) => `<svg viewBox="-28 -28 56 56" title="${o.label}">${OBSTACLE_ART[o.id]}</svg>`).join('')}</div>
-      </div>
-    </section>`;
-  root.querySelectorAll<HTMLButtonElement>('.theme-btn').forEach((b) => b.addEventListener('click', () => onChoose(b.dataset.theme as ThemeId), { signal }));
-  return { plane: $('.travel-plane', root), card: $('.intro-card', root), map: $('.map-svg', root) };
+        <div class="intro-avoid"><span class="intro-label">Avoid</span>${dest.obstacles.map((o) => `<svg viewBox="-28 -28 56 56" title="${o.label}">${OBSTACLE_ART[o.id]}</svg>`).join('')}</div>`;
+  parts.card.querySelectorAll<HTMLButtonElement>('.theme-btn').forEach((b) => b.addEventListener('click', () => onChoose(b.dataset.theme as ThemeId), { signal }));
 }
 
 function couponMarkup(theme: ThemeDef, counts: Counts, unlocked: boolean) {
@@ -139,13 +172,15 @@ export function renderJournal(root: HTMLElement, dest: DestinationDef, theme: Th
           }).join('')}
         </ul>
         <p class="journal-next">Next time, try ${others}.</p>
-        <button class="btn btn--primary btn--continue" type="button">${isLast ? 'See my passport' : 'Fly to Portugal'}</button>
+        <button class="btn btn--primary btn--continue" type="button">${isLast ? 'See my passport' : 'Back to the map'}</button>
       </div>
     </section>`;
   $('.btn--continue', root).addEventListener('click', onContinue, { signal });
 }
 
-export function renderFinal(root: HTMLElement, points: number, counts: Counts, chosen: Chosen, coupons: string[], onCta: () => void, onRestart: () => void, signal: AbortSignal) {
+export interface FinalHandlers { onCta: () => void; onRestart: () => void; onSendCoupons: (email: string) => void }
+
+export function renderFinal(root: HTMLElement, points: number, counts: Counts, chosen: Chosen, coupons: string[], h: FinalHandlers, signal: AbortSignal) {
   const lastDest = DESTINATIONS[DESTINATIONS.length - 1];
   const lastCostume = themeOf(lastDest, chosen[lastDest.id] ?? lastDest.themes[0].id).costume;
   const won = DESTINATIONS.flatMap((d) => d.themes.filter((t) => coupons.includes(`${d.id}:${t.id}`)).map((t) => t.coupon.title));
@@ -175,13 +210,31 @@ export function renderFinal(root: HTMLElement, points: number, counts: Counts, c
         <div class="final-wallet-row final-coupons">${TICKET_SVG}<span>${won.length ? won.join(' · ') : 'No coupons this trip'}</span></div>
       </div>
       <p class="demo-note">${DEMO_NOTE}</p>
+      <form class="email-form" novalidate>
+        <input class="email-input" type="email" inputmode="email" autocomplete="email" placeholder="your@email.com" aria-label="Email for coupons" ${won.length ? '' : 'disabled'} />
+        <button class="btn btn--send" type="submit" ${won.length ? '' : 'disabled'}>Send coupons</button>
+      </form>
+      <p class="email-note">${won.length ? 'Mock only — nothing is sent or stored.' : 'Unlock a coupon to try the mock email send.'}</p>
+      <div class="email-confirm" role="status" aria-live="polite"></div>
       <p class="final-message">You discovered, played and redeemed. That's the Scrambly loop: discover games, play and progress, then redeem rewards.</p>
       <button class="btn btn--primary btn--cta" type="button">Explore Scrambly</button>
       <div class="cta-confirm" role="status" aria-live="polite"></div>
       <button class="btn btn--ghost btn--restart-final" type="button">Play again · try other themes</button>
     </section>`;
-  $('.btn--cta', root).addEventListener('click', onCta, { signal });
-  $('.btn--restart-final', root).addEventListener('click', onRestart, { signal });
+  $('.btn--cta', root).addEventListener('click', h.onCta, { signal });
+  $('.btn--restart-final', root).addEventListener('click', h.onRestart, { signal });
+  const form = $<HTMLFormElement>('.email-form', root);
+  const input = $<HTMLInputElement>('.email-input', root);
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const email = input.value.trim();
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    input.classList.remove('invalid');
+    if (!valid) { void input.offsetWidth; input.classList.add('invalid'); input.focus(); return; }
+    h.onSendCoupons(email);
+    $('.email-confirm', root).textContent = `Sent to ${email} (demo, nothing really sent)`;
+    input.blur();
+  }, { signal });
 }
 
 export function showCtaConfirm(root: HTMLElement) {

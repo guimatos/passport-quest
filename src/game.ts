@@ -8,7 +8,8 @@ import { createRandom, seedFromUrl } from './lib/random';
 import { Runner, type Entity } from './scene/runner';
 import { Fx } from './fx/fx';
 import { Hud } from './ui/hud';
-import { renderStart, renderRedeem, renderJournal, renderIntro, renderFinal, showCtaConfirm, clearScreen, type Counts, type Chosen } from './ui/screens';
+import { renderStart, renderRedeem, renderJournal, renderIntro, markIntroDestination, renderThemeCard, renderFinal, showCtaConfirm, clearScreen, type Counts, type Chosen } from './ui/screens';
+import { Music } from './audio/music';
 import { MAP_POINTS, MAP_W } from './art/map';
 
 export type GameState = 'start' | 'intro' | 'playing' | 'redeem' | 'journal' | 'final';
@@ -57,6 +58,7 @@ export class Game {
   private loop: Loop;
   private fx: Fx;
   private hud: Hud;
+  private music = new Music();
   private runner: Runner | null = null;
   private random = createRandom(1);
   private hintTimer: number | undefined;
@@ -90,6 +92,7 @@ export class Game {
     this.clock.clearAll();
     this.hintTimer = this.bubbleTimer = undefined;
     this.fx.clear();
+    this.music.stop();
     this.runner?.destroy();
     this.runner = null;
     this.hud.unmount();
@@ -106,6 +109,7 @@ export class Game {
     this.completedDests = [];
     this.coupons = [];
     this.speedToastShown = false;
+    this.flying = false;
   }
 
   private init() {
@@ -114,7 +118,9 @@ export class Game {
     this.random = createRandom(seedFromUrl());
 
     document.addEventListener('visibilitychange', () => {
-      this.loop.setPaused('hidden', document.visibilityState === 'hidden');
+      const hidden = document.visibilityState === 'hidden';
+      this.loop.setPaused('hidden', hidden);
+      this.music.setHidden(hidden);
     }, { signal });
     window.addEventListener('resize', () => this.checkOrientation(), { signal });
     window.addEventListener('orientationchange', () => this.checkOrientation(), { signal });
@@ -146,33 +152,53 @@ export class Game {
   private enterStart() {
     this.setState('start');
     this.app.style.setProperty('--scene-bg', '#201338');
-    renderStart(this.overlay, () => this.enterIntro(0), this.ac.signal);
+    renderStart(this.overlay, () => { this.music.unlock(); this.music.play('menu'); this.enterMap(); }, this.ac.signal);
+  }
+
+  private mountHud() {
+    if (!$('#hud').childElementCount) {
+      this.hud.mount(() => this.reset(), () => { this.music.setMuted(!this.music.muted); return this.music.muted; }, this.music.muted, this.ac.signal);
+    }
   }
 
   /**
-   * Level intro: the journey map with the plane flying to the destination,
-   * then a card asking which theme to explore. Choosing a theme starts the run.
+   * Map hub: shows the journey map and asks where to go. When only one
+   * destination remains it is selected automatically. Picking a destination
+   * flies the plane there and shows that city's theme card.
    */
-  private enterIntro(index: number) {
+  private enterMap() {
     this.allCountsStore = { ...this.allCountsStore, ...this.counts };
-    this.destIndex = index;
     this.runner?.destroy();
     this.runner = null;
     this.setState('intro');
     this.app.style.setProperty('--scene-bg', '#7845D8');
-    const dest = this.destination;
-    if (!$('#hud').childElementCount) this.hud.mount(() => this.reset(), this.ac.signal);
-    this.hud.setDestination(dest, this.completedDests);
+    this.mountHud();
     this.hud.setPoints(this.points);
+    this.music.play('menu');
 
     const completed = this.completedDests.map((id) => DESTINATIONS.findIndex((d) => d.id === id));
-    const parts = renderIntro(this.overlay, dest, index, completed, (theme) => this.startLevel(index, theme), this.ac.signal);
+    const remaining = DESTINATIONS.map((_, i) => i).filter((i) => !completed.includes(i));
+    const parts = renderIntro(this.overlay, completed, (i) => this.flyTo(parts, i, completed), this.ac.signal);
+    if (remaining.length === 1) this.clock.after(900, () => this.flyTo(parts, remaining[0], completed));
+  }
 
-    // Plane flight along a quadratic curve in map coordinates.
+  private flying = false;
+
+  private flyTo(parts: ReturnType<typeof renderIntro>, index: number, completed: number[]) {
+    if (this.state !== 'intro' || this.flying) return; // double-tap guard
+    this.flying = true;
+    this.destIndex = index;
+    const dest = this.destination;
+    this.hud.setDestination(dest, this.completedDests);
+    markIntroDestination(parts, index);
+
+    // Plane flight along a quadratic curve in map coordinates: from the previous
+    // city if there is one, otherwise from off-screen.
+    const prev = completed.length ? completed[completed.length - 1] : -1;
     const P2 = index === 0 ? MAP_POINTS.rio : MAP_POINTS.porto;
-    const P0 = index === 0 ? MAP_POINTS.entry : MAP_POINTS.rio;
-    const P1 = index === 0 ? MAP_POINTS.entryControl : MAP_POINTS.routeControl;
-    const duration = index === 0 ? 1500 : 2200;
+    const P0 = prev >= 0 ? (prev === 0 ? MAP_POINTS.rio : MAP_POINTS.porto) : (index === 0 ? MAP_POINTS.entry : MAP_POINTS.entryRight);
+    const P1 = prev >= 0 ? MAP_POINTS.routeControl : (index === 0 ? MAP_POINTS.entryControl : MAP_POINTS.entryRightControl);
+    const duration = prev >= 0 ? 2200 : 1500;
     this.clock.tween(duration, (t) => {
       const e = easeInOutCubic(t);
       const x = (1 - e) ** 2 * P0.x + 2 * (1 - e) * e * P1.x + e ** 2 * P2.x;
@@ -182,8 +208,10 @@ export class Game {
       const s = parts.map.getBoundingClientRect().width / MAP_W;
       parts.plane.style.transform = `translate(${x * s}px, ${y * s}px) rotate(${Math.atan2(dy, dx) * 180 / Math.PI}deg)`;
     }, () => {
+      this.flying = false;
       parts.plane.classList.add('landed');
       parts.map.querySelector('.map-marker--active')?.classList.add('arrived');
+      renderThemeCard(parts, dest, (theme) => this.startLevel(index, theme), this.ac.signal);
       parts.card.classList.add('show');
       this.clock.tween(500, (t) => { parts.card.style.transform = `translateY(${(1 - easeOutBack(t)) * 60}px)`; parts.card.style.opacity = String(Math.min(1, t * 2)); });
     });
@@ -213,12 +241,13 @@ export class Game {
     }, this.random, this.ac.signal, this.stage);
     this.sceneRoot.appendChild(this.runner.el);
 
-    if (!$('#hud').childElementCount) this.hud.mount(() => this.reset(), this.ac.signal);
+    this.mountHud();
     this.hud.setDestination(dest, this.completedDests);
     this.hud.setTheme(theme);
     this.hud.setPoints(this.points);
+    this.music.play(dest.id === 'brazil' ? 'rio' : 'porto');
     const couponItem = theme.items.find((i) => i.id === theme.coupon.itemId)!;
-    this.say(index === 0 ? 'Move up and down to guide Capi!' : `${dest.name}! Faster this time.`, 2400);
+    this.say(this.completedDests.length === 0 ? 'Move up and down to guide Capi!' : `${dest.name}! Faster this time.`, 2400);
     this.clock.after(2600, () => this.say(`Catch ${theme.coupon.need} ${couponItem.label.toLowerCase()}s for a coupon!`, 2600));
     this.armHint();
   }
@@ -282,6 +311,7 @@ export class Game {
     this.runner?.finish();
     this.say(`${dest.shortName} complete! Reward time.`, 3000, 'cheer');
     this.hud.toast('Passport stamped!', 'toast--done');
+    this.music.jingle();
     this.fx.confetti();
     this.hud.setDestination(dest, this.completedDests);
     this.hud.setTheme(theme);
@@ -299,7 +329,7 @@ export class Game {
         this.setState('journal');
         renderJournal(this.overlay, dest, theme, this.counts, isLast, () => {
           if (this.state !== 'journal') return;
-          if (isLast) this.enterFinal(); else this.enterIntro(this.destIndex + 1);
+          if (isLast) this.enterFinal(); else this.enterMap();
         }, this.ac.signal);
       }, this.ac.signal);
     });
@@ -312,8 +342,19 @@ export class Game {
     this.hud.unmount();
     this.app.style.setProperty('--scene-bg', '#201338');
     const allCounts: Counts = { ...this.allCountsStore, ...this.counts };
-    renderFinal(this.overlay, this.points, allCounts, this.chosen, this.coupons, () => this.onCta(), () => this.reset(), this.ac.signal);
+    this.music.play('menu');
+    renderFinal(this.overlay, this.points, allCounts, this.chosen, this.coupons, {
+      onCta: () => this.onCta(),
+      onRestart: () => this.reset(),
+      onSendCoupons: (email) => this.onSendCoupons(email),
+    }, this.ac.signal);
     this.fx.confetti(36);
+  }
+
+  /** Mock only: nothing leaves the page. Logged so reviewers can see the call. */
+  private onSendCoupons(email: string) {
+    const titles = DESTINATIONS.flatMap((d) => d.themes.filter((t) => this.coupons.includes(`${d.id}:${t.id}`)).map((t) => t.coupon.title));
+    console.log('[Passport Quest] mock: would send coupons', titles, 'to', email, '(demo — no request made)');
   }
 
   private onCta() {

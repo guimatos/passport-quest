@@ -10,16 +10,19 @@ export const MAP_POINTS = {
   rio: { x: 96, y: 150 },
   porto: { x: 243, y: 58 },
   routeControl: { x: 150, y: 10 },
-  /** Off-screen entry point for the first flight into Rio. */
+  /** Off-screen entry points for the first flight into each city. */
   entry: { x: -30, y: 30 },
   entryControl: { x: 10, y: 150 },
+  entryRight: { x: 350, y: 230 },
+  entryRightControl: { x: 330, y: 80 },
 };
 
-export function mapSvg(activeIndex: number, completed: number[]): string {
+/** activeIndex: destination being flown to (-1 while choosing). completed: indexes already stamped. pick: markers are tappable. */
+export function mapSvg(activeIndex: number, completed: number[], pick = false): string {
   const marker = (p: { x: number; y: number }, n: number, label: string, lx: number, ly: number, landmark: string) => {
-    const state = completed.includes(n - 1) ? 'done' : activeIndex === n - 1 ? 'active' : 'locked';
+    const state = completed.includes(n - 1) ? 'done' : activeIndex === n - 1 ? 'active' : pick ? 'pick' : 'locked';
     return `
-      <g class="map-marker map-marker--${state}" transform="translate(${p.x} ${p.y})">
+      <g class="map-marker map-marker--${state}" data-index="${n - 1}" transform="translate(${p.x} ${p.y})">
         ${landmark}
         <circle class="map-marker-ring" r="14"/>
         <circle class="map-marker-dot" r="9"/>
