@@ -207,12 +207,19 @@ export class Runner {
       this.addEntity('obstacle', def.id, SPAWN_X, y, def.scale ?? 1, OBSTACLE_ART[def.id]);
       return;
     }
-    const def = items[Math.floor(this.random() * items.length)];
+    const def = this.pickWeighted(items);
     // Sometimes spawn a short chain of the same item for a satisfying streak.
     const chain = this.random() < 0.25 ? 3 : 1;
     for (let i = 0; i < chain; i++) {
       this.addEntity('item', def.id, SPAWN_X + i * 64, y, def.scale ?? 1, ITEM_ART[def.id]());
     }
+  }
+
+  private pickWeighted<T extends { weight?: number }>(list: T[]): T {
+    const total = list.reduce((n, i) => n + (i.weight ?? 1), 0);
+    let r = this.random() * total;
+    for (const i of list) { r -= i.weight ?? 1; if (r <= 0) return i; }
+    return list[list.length - 1];
   }
 
   private addEntity(kind: Entity['kind'], id: ItemId | ObstacleId, x: number, y: number, scale: number, markup: string) {

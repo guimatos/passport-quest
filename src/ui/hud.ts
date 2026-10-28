@@ -1,16 +1,16 @@
 import type { DestinationDef, ItemId } from '../data/destinations';
 import { DESTINATIONS } from '../data/destinations';
-import { ITEM_ART } from '../art/items';
+import { ITEM_ART, TICKET_SVG } from '../art/items';
 import { $, centerOf } from '../lib/dom';
 
 /**
- * In-game HUD: restart, destination label, demo-points wallet, the three
- * item types as silhouettes that fill in when first discovered, and the
- * passport progress bar.
+ * In-game HUD: restart, destination label, demo-points wallet, the passport
+ * progress bar, and one chip per item type showing its silhouette until it is
+ * discovered plus a running count. The coupon item chip shows "n/need".
  */
 export class Hud {
   private pointsEl!: HTMLElement;
-  private objectivesEl!: HTMLElement;
+  private chipsEl!: HTMLElement;
   private barFill!: HTMLElement;
   private barText!: HTMLElement;
 
@@ -33,18 +33,18 @@ export class Hud {
           <span class="wallet-label">demo pts</span>
         </div>
       </div>
-      <div class="hud-objectives">
-        <div class="objectives"></div>
+      <div class="hud-row2">
         <div class="passport-bar" role="progressbar" aria-label="Passport progress">
           <div class="passport-bar-fill"></div>
           <span class="passport-bar-text">0/0</span>
         </div>
+        <div class="chips"></div>
       </div>
       <div class="hud-toast" role="status"></div>
       <div class="hud-trip" aria-label="Trip progress"></div>`;
     this.root.hidden = false;
     this.pointsEl = $('.wallet-points', this.root);
-    this.objectivesEl = $('.objectives', this.root);
+    this.chipsEl = $('.chips', this.root);
     this.barFill = $('.passport-bar-fill', this.root);
     this.barText = $('.passport-bar-text', this.root);
     $('.btn--restart', this.root).addEventListener('click', onRestart, { signal });
@@ -53,12 +53,16 @@ export class Hud {
   setDestination(dest: DestinationDef, completedIds: string[]) {
     $('.hud-place-name', this.root).textContent = dest.shortName;
     $('.hud-place-country', this.root).textContent = dest.country;
-    this.objectivesEl.innerHTML = dest.items.map((it) => `
-      <div class="objective" data-id="${it.id}" title="${it.label}">
-        <svg viewBox="-28 -28 56 56" class="objective-sil">${ITEM_ART[it.id]({ silhouette: true })}</svg>
-        <svg viewBox="-28 -28 56 56" class="objective-art">${ITEM_ART[it.id]()}</svg>
-        <span class="objective-check" aria-hidden="true"></span>
-      </div>`).join('');
+    this.chipsEl.innerHTML = dest.items.map((it) => {
+      const isCoupon = it.id === dest.coupon.itemId;
+      return `
+      <div class="chip ${isCoupon ? 'chip--coupon' : ''}" data-id="${it.id}" title="${it.label}">
+        <svg viewBox="-28 -28 56 56" class="chip-sil">${ITEM_ART[it.id]({ silhouette: true })}</svg>
+        <svg viewBox="-28 -28 56 56" class="chip-art">${ITEM_ART[it.id]()}</svg>
+        <span class="chip-count">${isCoupon ? `0/${dest.coupon.need}` : '0'}</span>
+        ${isCoupon ? `<span class="chip-ticket">${TICKET_SVG}</span>` : ''}
+      </div>`;
+    }).join('');
     this.setProgress(0, dest.level.goal);
     $('.hud-trip', this.root).innerHTML = DESTINATIONS.map((d) => {
       const state = completedIds.includes(d.id) ? 'done' : d.id === dest.id ? 'active' : 'locked';
@@ -66,8 +70,15 @@ export class Hud {
     }).join('<span class="trip-line"></span>');
   }
 
-  markDiscovered(id: ItemId) {
-    this.root.querySelector(`.objective[data-id="${id}"]`)?.classList.add('found');
+  setCount(id: ItemId, count: number, couponNeed?: number, couponDone = false) {
+    const chip = this.root.querySelector<HTMLElement>(`.chip[data-id="${id}"]`);
+    if (!chip) return;
+    chip.classList.add('found');
+    chip.classList.toggle('chip--done', couponDone);
+    $('.chip-count', chip).textContent = couponNeed ? `${Math.min(count, couponNeed)}/${couponNeed}` : String(count);
+    chip.classList.remove('bump');
+    void chip.offsetWidth;
+    chip.classList.add('bump');
   }
 
   setProgress(value: number, goal: number, flash: 'up' | 'down' | null = null) {
@@ -88,7 +99,7 @@ export class Hud {
     }
   }
 
-  /** Big short-lived label in the middle of the screen ("Faster!", "Ouch!"). */
+  /** Big short-lived label in the middle of the screen ("Faster!", "Coupon unlocked!"). */
   toast(text: string, cls = '') {
     const el = $('.hud-toast', this.root);
     el.textContent = text;
@@ -98,8 +109,8 @@ export class Hud {
   }
 
   walletPoint() { return centerOf($('.wallet-coin', this.root).getBoundingClientRect()); }
-  objectivePoint(id: ItemId) {
-    const el = this.root.querySelector(`.objective[data-id="${id}"]`);
+  chipPoint(id: ItemId) {
+    const el = this.root.querySelector(`.chip[data-id="${id}"]`);
     return el ? centerOf(el.getBoundingClientRect()) : this.walletPoint();
   }
   barPoint() { return centerOf($('.passport-bar', this.root).getBoundingClientRect()); }

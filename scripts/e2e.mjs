@@ -88,13 +88,18 @@ await sleep(1500);
 await shot('04-redeem');
 const r1 = await dbg();
 check(r1.state === 'redeem', 'redeem state after completion');
-check(r1.progress === 15, "progress capped at goal (15)");
-check(r1.points >= 15 * 10, `points include bonus (${r1.points})`);
+check(r1.progress === 16, 'progress capped at goal (16)');
+check(r1.points >= 16 * 10, `points include bonus (${r1.points})`);
 check((await page.$('.btn--continue')) !== null, 'redeem card visible');
 await page.tap('.btn--continue');
 await page.tap('.btn--continue').catch(() => {});
 await sleep(200);
-check((await state()) === 'travel', 'continue enters travel (double tap ignored)');
+check((await state()) === 'journal', 'continue enters journal (double tap ignored)');
+await shot('04b-journal');
+check((await page.$$('.journal-row')).length === 5, 'journal lists 5 items');
+await page.tap('.btn--continue');
+await sleep(200);
+check((await state()) === 'travel', 'journal continue enters travel');
 await sleep(1200); await shot('05-travel');
 await sleep(2800);
 check((await state()) === 'playing', 'travel auto-enters Portugal');
@@ -104,12 +109,12 @@ const t1 = Date.now();
 await autopilot(90000, 'item');
 check((await state()) !== 'playing', `Portugal completed via autopilot in ${((Date.now() - t1) / 1000).toFixed(1)}s`);
 await sleep(1500);
-await page.tap('.btn--continue');
-await sleep(300);
+await page.tap('.btn--continue'); await sleep(200);
+await page.tap('.btn--continue'); await sleep(300);
 check((await state()) === 'final', 'final screen');
 await shot('07-final');
 const finalPts = await page.$eval('.final-wallet strong', (e) => Number(e.textContent));
-check(finalPts >= 33 * 10 + 200, `final total shown (${finalPts})`);
+check(finalPts >= 34 * 10 + 200, `final total shown (${finalPts})`);
 await page.tap('.btn--cta');
 await sleep(200);
 check(logs.some((l) => l.includes('CTA clicked')), 'CTA console.log');
@@ -126,8 +131,13 @@ for (let i = 0; i < 12; i++) {
   await page.tap('.btn--play'); await sleep(80);
   if (i % 3 === 1) {
     await autopilot(90000, 'item'); await sleep(1200);
-    await page.tap('.btn--continue'); await sleep(500);
-    check((await state()) === 'travel', `iteration ${i}: in travel`);
+    await page.tap('.btn--continue'); await sleep(300);
+    if (i % 2 === 0) {
+      await page.tap('.btn--continue'); await sleep(300);
+      check((await state()) === 'travel', `iteration ${i}: in travel`);
+    } else {
+      check((await state()) === 'journal', `iteration ${i}: in journal`);
+    }
   } else if (i % 3 === 2) {
     await autopilot(1500, 'item');
   }

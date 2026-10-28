@@ -350,9 +350,11 @@ body {
 }
 
 /* During redeem and travel, keep only the top bar (Restart + wallet) visible. */
-#app[data-state="redeem"] .hud-objectives,
+#app[data-state="redeem"] .hud-row2,
 #app[data-state="redeem"] .hud-trip,
-#app[data-state="travel"] .hud-objectives,
+#app[data-state="journal"] .hud-row2,
+#app[data-state="journal"] .hud-trip,
+#app[data-state="travel"] .hud-row2,
 #app[data-state="travel"] .hud-trip { display: none; }
 #app[data-state="travel"] .hud-place { visibility: hidden; }
 
@@ -433,3 +435,97 @@ body {
 @keyframes hint-hand { 0%, 100% { transform: translateY(-22px); } 50% { transform: translateY(22px); } }
 
 .float-text--bad { color: #FFB38A; text-shadow: 0 2px 0 #7a1f10, 0 4px 10px rgba(0,0,0,0.4); }
+
+/* ---------- HUD row 2: progress bar + item chips ---------- */
+.hud-objectives { display: none; }
+.hud-row2 {
+  position: absolute;
+  top: calc(var(--hud-pad) + 52px);
+  left: 8px; right: 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+}
+.hud-row2 .passport-bar { width: 150px; height: 20px; }
+.chips { display: flex; gap: 4px; }
+.chip {
+  position: relative;
+  width: 44px; height: 40px;
+  border-radius: 10px;
+  background: var(--ink-80);
+  color: rgba(255,246,232,0.35);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  backdrop-filter: blur(4px);
+}
+.chip svg.chip-sil, .chip svg.chip-art { position: absolute; top: 1px; width: 24px; height: 24px; transition: opacity 0.25s ease, transform 0.3s cubic-bezier(.34,1.56,.64,1); }
+.chip-art { opacity: 0; transform: scale(0.4); }
+.chip.found .chip-sil { opacity: 0; }
+.chip.found .chip-art { opacity: 1; transform: scale(1); }
+.chip-count { position: absolute; bottom: 2px; font-size: 10px; font-weight: 700; color: var(--cream); line-height: 1; }
+.chip--coupon { box-shadow: 0 0 0 2px var(--orange); }
+.chip-ticket { position: absolute; right: -5px; top: -5px; width: 16px; height: 12px; color: var(--orange); }
+.chip-ticket svg { width: 100%; height: 100%; display: block; }
+.chip--done { background: var(--orange); color: rgba(32,19,56,0.4); }
+.chip--done .chip-count { color: var(--ink); }
+.chip--done .chip-ticket { color: var(--cream); }
+.chip.bump { animation: chip-bump 0.3s ease; }
+@keyframes chip-bump { 40% { transform: scale(1.15); } }
+.hud-toast.toast--coupon { color: var(--orange); }
+
+/* ---------- coupons ---------- */
+.coupon {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border-radius: 14px; padding: 8px 10px; text-align: left;
+}
+.coupon--unlocked { background: #FFF0E0; border: 2px solid var(--orange); color: var(--ink); }
+.coupon--locked { background: rgba(32,19,56,0.06); border: 2px dashed rgba(32,19,56,0.25); color: rgba(32,19,56,0.75); }
+.coupon-icon { width: 30px; height: 24px; flex: none; color: var(--orange); }
+.coupon--locked .coupon-icon { color: rgba(32,19,56,0.35); }
+.coupon-icon svg, .ticket { width: 100%; height: 100%; display: block; }
+.coupon-text { display: flex; flex-direction: column; gap: 1px; font-size: 12px; line-height: 1.2; flex: 1; min-width: 0; }
+.coupon-text strong { font-size: 14px; }
+.coupon--unlocked .coupon-text strong { color: #c5611a; }
+.coupon-item { width: 32px; height: 32px; flex: none; }
+.coupon--unlocked { animation: coupon-in 0.5s cubic-bezier(.34,1.56,.64,1) 0.5s both; }
+@keyframes coupon-in { from { transform: scale(0.6) rotate(-6deg); opacity: 0; } }
+
+/* ---------- journal ---------- */
+.screen--journal { background: rgba(32,19,56,0.65); backdrop-filter: blur(3px); }
+.journal-card { padding: 16px 12px 12px; max-height: calc(100% - 24px); }
+.journal-card h2 { font-size: 20px; }
+.journal {
+  list-style: none; width: 100%; display: flex; flex-direction: column; gap: 6px;
+  overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
+}
+.journal-row { display: flex; align-items: flex-start; gap: 8px; text-align: left; background: #fffaf2; border-radius: 12px; padding: 7px 8px; }
+.journal-row--missed { opacity: 0.6; }
+.journal-icon { width: 34px; height: 34px; flex: none; }
+.journal-text { display: flex; flex-direction: column; gap: 1px; font-size: 11px; line-height: 1.3; }
+.journal-text strong { font-size: 13px; }
+.journal-count { color: var(--purple); font-weight: 700; margin-left: 2px; }
+.journal-card .btn--continue { margin-top: 4px; min-height: 46px; font-size: 18px; }
+
+/* ---------- final wallet with coupons ---------- */
+.final-wallet { flex-direction: column; gap: 4px; padding: 8px 14px; border-radius: 16px; width: min(100%, 300px); }
+.final-wallet-row { display: flex; align-items: center; gap: 8px; }
+.final-coupons { font-size: 12px; text-align: left; }
+.final-coupons .ticket { width: 24px; height: 18px; flex: none; color: var(--orange); }
+.passport-items svg { width: 20px; height: 20px; }
+.passport-items svg.missed { opacity: 0.25; filter: grayscale(1); }
+@media (max-height: 600px) {
+  .journal-text { font-size: 10.5px; }
+  .journal-icon { width: 28px; height: 28px; }
+  .screen--final h2 { font-size: 22px; }
+  .final-message { font-size: 11px; margin-top: 2px; }
+}
+
+/* Cards sit below the HUD top bar (Restart + wallet stay usable). */
+.screen--redeem, .screen--journal { padding-top: calc(var(--hud-pad) + 58px); padding-bottom: 12px; justify-content: flex-start; }
+.screen--redeem .card { margin-top: 44px; }
+.journal-card { flex: 0 1 auto; max-height: 100%; min-height: 0; }
+.journal { flex: 1 1 auto; min-height: 0; overscroll-behavior: contain; }
+.redeem-card { padding: 18px 16px 12px; gap: 7px; }
+.redeem-card h2 { font-size: 22px; }
+.reward { padding: 8px 10px; }
+.reward-stamp { width: 64px; height: 64px; }
+.card .demo-note { font-size: 10px; }
+.journal { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); padding-bottom: 14px; }

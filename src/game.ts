@@ -1,4 +1,4 @@
-import { DESTINATIONS, POINTS_PER_ITEM, COMPLETION_BONUS, type DestinationDef, type ItemId } from './data/destinations';
+import { DESTINATIONS, POINTS_PER_ITEM, COMPLETION_BONUS, COUPON_BONUS, type DestinationDef, type ItemId } from './data/destinations';
 import { ITEM_ART } from './art/items';
 import { SCENE_ART } from './art/scenes';
 import { Clock, easeInOutCubic, easeOutBack } from './lib/clock';
@@ -8,18 +8,22 @@ import { createRandom, seedFromUrl } from './lib/random';
 import { Runner, type Entity } from './scene/runner';
 import { Fx } from './fx/fx';
 import { Hud } from './ui/hud';
-import { renderStart, renderRedeem, renderTravel, renderFinal, showCtaConfirm, clearScreen } from './ui/screens';
+import { renderStart, renderRedeem, renderJournal, renderTravel, renderFinal, showCtaConfirm, clearScreen, type Counts } from './ui/screens';
 
-export type GameState = 'start' | 'playing' | 'redeem' | 'travel' | 'final';
+export type GameState = 'start' | 'playing' | 'redeem' | 'journal' | 'travel' | 'final';
 
 const HINT_DELAY = 4000;
 const DISCOVER_LINES: Record<ItemId, string> = {
   coconut: 'A coconut! Refreshing.',
   football: 'Goooal! A football.',
   seashell: 'A seashell! Pretty.',
+  acai: 'Açaí bowl! Energy.',
+  flipflop: 'A flip-flop! Beach style.',
   azulejo: 'An azulejo tile!',
   tram: 'A tiny tram. Ding ding!',
   nata: 'Pastel de nata. Yum!',
+  francesinha: 'A francesinha! Hearty.',
+  rabelo: 'A rabelo boat!',
 };
 
 /**
@@ -32,8 +36,9 @@ export class Game {
   private destIndex = 0;
   private points = 0;
   private progress = 0;
-  private discovered = new Set<ItemId>();
+  private counts: Counts = {};
   private completedDests: string[] = [];
+  private coupons: string[] = [];
   private speedToastShown = false;
 
   private ac = new AbortController();
@@ -83,8 +88,10 @@ export class Game {
     this.destIndex = 0;
     this.points = 0;
     this.progress = 0;
-    this.discovered = new Set();
+    this.counts = {};
     this.completedDests = [];
+    this.coupons = [];
+    this.allCountsStore = {};
     this.speedToastShown = false;
   }
 
@@ -107,7 +114,7 @@ export class Game {
 
   private frame(dt: number) {
     this.clock.tick(dt);
-    if (this.runner && (this.state === 'playing' || this.state === 'redeem')) {
+    if (this.runner && (this.state === 'playing' || this.state === 'redeem' || this.state === 'journal')) {
       this.runner.update(dt);
       if (this.state === 'playing' && !this.speedToastShown && this.runner.progressRamp > 0.45) {
         this.speedToastShown = true;
@@ -132,7 +139,7 @@ export class Game {
   private enterPlaying(index: number) {
     this.destIndex = index;
     this.progress = 0;
-    this.discovered = new Set();
+    this.counts = {};
     this.speedToastShown = false;
     this.runner?.destroy();
     clearScreen(this.overlay);
@@ -149,7 +156,9 @@ export class Game {
     if (!$('#hud').childElementCount) this.hud.mount(() => this.reset(), this.ac.signal);
     this.hud.setDestination(dest, this.completedDests);
     this.hud.setPoints(this.points);
-    this.say(index === 0 ? 'Move up and down to catch items!' : `${dest.name}! Faster this time.`, 2800);
+    const couponItem = dest.items.find((i) => i.id === dest.coupon.itemId)!;
+    this.say(index === 0 ? 'Move up and down to catch items!' : `${dest.name}! Faster this time.`, 2400);
+    this.clock.after(2600, () => this.say(`Catch ${dest.coupon.need} ${couponItem.label.toLowerCase()}s for a coupon!`, 2600));
     this.armHint();
   }
 
@@ -157,20 +166,31 @@ export class Game {
     if (this.state !== 'playing') return;
     const id = e.id as ItemId;
     const dest = this.destination;
-    const first = !this.discovered.has(id);
-    this.discovered.add(id);
+    const first = !this.counts[id];
+    const count = (this.counts[id] = (this.counts[id] ?? 0) + 1);
     this.progress = Math.min(dest.level.goal, this.progress + 1);
     this.armHint();
 
+    const isCouponItem = id === dest.coupon.itemId;
+    const couponJustUnlocked = isCouponItem && count === dest.coupon.need;
+
     this.fx.burst(screen.x, screen.y, dest.accent, 8);
     this.fx.floatText(screen.x, screen.y - 14, `+${POINTS_PER_ITEM}`);
-    const to = first ? this.hud.objectivePoint(id) : this.hud.barPoint();
+    const to = first || isCouponItem ? this.hud.chipPoint(id) : this.hud.barPoint();
     this.fx.fly(screen, to, ITEM_ART[id](), () => {
-      if (first) this.hud.markDiscovered(id);
+      this.hud.setCount(id, count, isCouponItem ? dest.coupon.need : undefined, isCouponItem && count >= dest.coupon.need);
       this.hud.setProgress(this.progress, dest.level.goal, 'up');
       this.addPoints(POINTS_PER_ITEM);
     });
-    if (first) this.say(DISCOVER_LINES[id], 1600);
+    if (couponJustUnlocked) {
+      this.coupons.push(dest.coupon.id);
+      this.addPoints(COUPON_BONUS);
+      this.hud.toast('Coupon unlocked!', 'toast--coupon');
+      this.fx.confetti(18);
+      this.say(`${dest.coupon.title} coupon — yours!`, 2000);
+    } else if (first) {
+      this.say(DISCOVER_LINES[id], 1600);
+    }
 
     if (this.progress >= dest.level.goal) this.completeDestination();
   }
@@ -200,19 +220,28 @@ export class Game {
     this.runner?.say(`${dest.shortName} complete!`);
     this.fx.confetti();
     this.hud.setDestination(dest, this.completedDests);
-    dest.items.forEach((it) => this.hud.markDiscovered(it.id));
+    for (const it of dest.items) {
+      const isCoupon = it.id === dest.coupon.itemId;
+      if (this.counts[it.id]) this.hud.setCount(it.id, this.counts[it.id]!, isCoupon ? dest.coupon.need : undefined, isCoupon && this.coupons.includes(dest.coupon.id));
+    }
     this.hud.setProgress(dest.level.goal, dest.level.goal);
     const isLast = this.destIndex === DESTINATIONS.length - 1;
+    const couponUnlocked = this.coupons.includes(dest.coupon.id);
     this.clock.after(900, () => {
       this.addPoints(COMPLETION_BONUS);
-      renderRedeem(this.overlay, dest, this.points, isLast, () => {
+      renderRedeem(this.overlay, dest, this.points, this.counts, couponUnlocked, () => {
         if (this.state !== 'redeem') return; // double-tap guard
-        if (isLast) this.enterFinal(); else this.enterTravel();
+        this.setState('journal');
+        renderJournal(this.overlay, dest, this.counts, isLast, () => {
+          if (this.state !== 'journal') return;
+          if (isLast) this.enterFinal(); else this.enterTravel();
+        }, this.ac.signal);
       }, this.ac.signal);
     });
   }
 
   private enterTravel() {
+    this.allCountsStore = { ...this.allCountsStore, ...this.counts };
     this.setState('travel');
     const from = this.destination;
     const to = DESTINATIONS[this.destIndex + 1];
@@ -247,9 +276,13 @@ export class Game {
     this.runner = null;
     this.hud.unmount();
     this.app.style.setProperty('--scene-bg', '#201338');
-    renderFinal(this.overlay, this.points, () => this.onCta(), () => this.reset(), this.ac.signal);
+    // Merge counts of both destinations for the passport pages (item ids are unique per destination).
+    renderFinal(this.overlay, this.points, this.allCounts, this.coupons, () => this.onCta(), () => this.reset(), this.ac.signal);
     this.fx.confetti(36);
   }
+
+  private allCountsStore: Counts = {};
+  private get allCounts(): Counts { return { ...this.allCountsStore, ...this.counts }; }
 
   private onCta() {
     console.log('[Passport Quest] CTA clicked — demo only (no navigation)');
@@ -290,6 +323,8 @@ export class Game {
       state: this.state,
       points: this.points,
       progress: this.progress,
+      counts: this.counts,
+      coupons: this.coupons,
       entities: this.runner?.liveEntities() ?? [],
       fox: this.runner?.foxPosition ?? null,
       toScreen: (x: number, y: number) => this.runner?.toScreen(x, y) ?? null,
