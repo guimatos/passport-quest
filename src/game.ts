@@ -70,6 +70,7 @@ export class Game {
   private shakeTween: number | undefined;
   private dustAcc = 0;
   private wiping = false;
+  private wipeCount = 0; // debug counter: wipes started since the last reset
 
   private readonly app = $('#app');
   private readonly stage = $('#stage');
@@ -109,6 +110,7 @@ export class Game {
     $('#flash').classList.remove('show');
     $('#wipe').className = '';
     this.wiping = false;
+    this.wipeCount = 0;
     this.dustAcc = 0;
     this.app.classList.remove('paused');
     this.app.dataset.state = '';
@@ -415,6 +417,7 @@ export class Game {
   private wipeTo(cb: () => void) {
     if (this.wiping) return;
     this.wiping = true;
+    this.wipeCount++;
     const el = $('#wipe');
     el.classList.remove('wipe-out'); el.classList.add('wipe-in');
     this.clock.after(200, () => {
@@ -468,6 +471,7 @@ export class Game {
       particles: this.fx.activeParticles,
       waterAlive: this.runner?.water?.alive ?? false,
       wiping: this.wiping,
+      wipes: this.wipeCount,
       reducedMotion: this.reducedMotion(),
     };
   }

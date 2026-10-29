@@ -56,10 +56,9 @@ const autopilot = (ms, target) => page.evaluate((ms, t) => window.__autopilot(ms
 await shot('01-start');
 check((await state()) === 'start', 'starts on start screen');
 await page.tap('.btn--play');
-await sleep(120);
-check((await state()) === 'start' && (await page.evaluate(() => window.passportQuest.debug.wiping)), 'play starts the screen wipe');
-await sleep(380);
+await sleep(500);
 check((await state()) === 'intro', 'play enters the map hub within the wipe (<= 500 ms)');
+check((await page.evaluate(() => window.passportQuest.debug.wipes)) === 1 && !(await page.evaluate(() => window.passportQuest.debug.wiping)), 'play ran exactly one screen wipe and it has released input');
 await sleep(400); await shot('01a-map');
 check((await page.$$('.dest-btn')).length === 2, 'map offers both destinations');
 await page.tap('.dest-btn[data-dest="brazil"]');
