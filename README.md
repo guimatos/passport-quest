@@ -16,6 +16,18 @@ redeem, with every balance and coupon clearly labelled as demo.
 No backend, no analytics, no external requests at runtime. Everything (code,
 fonts, art, music) is bundled or generated in the browser.
 
+## Versions
+
+| Stage | What | Where |
+|---|---|---|
+| 1 | SVG parallax runner, map hub, themes, passport and coupon loop, delivery ZIP | tag `stage1-v1` (2026-10-28) |
+| 2 and 2b | entity pooling, canvas particles, WebGL water, combo, dash, golden items, hit-stop, onboarding, keyboard | merged into `main` |
+| 3 | 3D WebGL run (Rio beach, Porto quay, five costumes, every item and obstacle as a model) with the SVG runner as fallback | merged into `main` on 2026-10-29 |
+
+`main` holds everything. The `stage2/polish-perf` and `stage3/3d-runner`
+branches are merged and kept only as history. Stages 2 and 3 have no tag yet;
+`npm run check` is green at the merge commit.
+
 ## Build and run
 
 Requirements: Node 22 (`.nvmrc`), npm. Python 3 is used only for the static
@@ -50,6 +62,9 @@ adds `RUN.txt`, this README and a `source/` folder with the readable
 TypeScript source, scripts and docs, then prints the byte size and root
 listing and fails if `index.html` is not at the root or the ZIP exceeds
 5,000,000 bytes. The exact byte size of the delivered ZIP is in the Stage 1 final report and in the `stage1-v1` tag message.
+The script still names the ZIP `passport-quest-stage1.zip` and labels
+`RUN.txt` as the Stage 1 build; change both in `scripts/package.mjs` before
+packaging the 3D version.
 
 ### Scripts
 
@@ -139,7 +154,7 @@ tablet was used; the developer records real-device results separately.
 Run the same checks yourself:
 
 ```bash
-npm run check   # all gates against a static preview of dist/ (about 5 minutes)
+npm run check   # all gates against a static preview of dist/ (about 10 minutes: 3D at both sizes, then 2D once)
 
 # or individually, against the dev server:
 npm run dev &
@@ -241,9 +256,10 @@ library (it is already installed in this workspace). Then:
   being asked.
 - "Ship to QA" means build and run the e2e script against the static `dist/`
   server. "Finalize" means the full gates plus `npm run package`.
-- Stage 2 work goes on a `stage2/<slug>` branch and Stage 3 (the 3D runner)
-  on `stage3/<slug>`; each stage gets its own tag and the `stage1-v1` tag is
-  never moved.
+- Stages 2 and 3 were built on `stage2/<slug>` and `stage3/<slug>` branches
+  and merged into `main` (fast-forward, linear history). New work branches
+  from `main` as `<topic>/<slug>` and merges back once `npm run check` is
+  green. Each delivered stage gets its own tag; `stage1-v1` is never moved.
 
 ## Credits
 

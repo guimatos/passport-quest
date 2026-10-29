@@ -51,6 +51,12 @@ Time per section and the recording tool are left for the developer to fill in.
      main-thread busy time from ~49% to ~37% at 6x CPU throttle; the particle
      canvas is free at DPR 1.5 (and was not at DPR 2); the water adds ~3
      points in software GL.
+   - Stage 3: the run is a 3D world drawn with hand-written WebGL 1 (about
+     40 KB, no library, because the bundle budget is 300,000 bytes). Open
+     `?mode=2d` next to it to show the same loop in the SVG runner, and
+     `gallery.html` on the dev server for every model. Point at the Stage 3
+     perf rows: six DOM nodes and about 25 draw calls per frame, main thread
+     about 10% busy against 37% for the SVG scene (software GL, upper bound).
 
 7. **The Scrambly connection** (_time: …_)
    - Discover (theme + items) → Play & progress (demo points, passport bar) →
@@ -58,13 +64,16 @@ Time per section and the recording tool are left for the developer to fill in.
 
 8. **Testing** (_time: …_)
    - Run `npm run check`: typecheck, build, bundle budget, e2e at both sizes
-     on a static preview of `dist/`, layout checks, perf print; the same job is
-     in `.github/workflows/check.yml`. Show the emulated-vs-real table in the
-     README and the ZIP size check from `npm run package`.
+     in 3D plus once in 2D (`MODE=2d`) on a static preview of `dist/`, layout
+     checks, perf print; the same job is in `.github/workflows/check.yml`.
+     Show the GL context-loss test and the seeded golden-item run in
+     `scripts/e2e.mjs`, the emulated-vs-real table in the README and the ZIP
+     size check from `npm run package`.
 
 9. **Limitations** (_time: …_)
-   - Emulated testing only, music unauditioned, keyboard on the final screen,
-     autopilot-tuned difficulty. What Stage 2 could add.
+   - Emulated testing only (the 3D run was seen only in software GL, so
+     phone GPU frame rate is unknown), music unauditioned, keyboard on the
+     final screen, autopilot-tuned difficulty. What a next stage could add.
 
 _Tool used for recording: …_
 _Total time: …_

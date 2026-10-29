@@ -207,7 +207,9 @@ the 4 s idle hint takes over; the first fox line says "Tap to dash!".
 ## 3D runner (Stage 3)
 
 The run became a 3D world; the loop, screens, HUD, data, effects and the Stage
-2b feel rules are unchanged. The SVG runner stays as the fallback.
+2b feel rules are unchanged. The SVG runner stays as the fallback. Built on
+`stage3/3d-runner` and merged into `main` on 2026-10-29 (fast-forward; the
+whole history is linear).
 
 **Decisions**
 
@@ -301,8 +303,11 @@ but it has not been measured on one.
    control mapping is linear and `debug.toScreen(x, 0)` is its exact inverse,
    so the autopilot targets a lane, not a pixel.
 3. **A flaky golden assertion.** Sampling the entity list every 100 ms missed
-   golden items; with seed 7 a city may spawn none at all. The runner now
-   counts golden spawns (`feel.goldens`) and the e2e checks the trip total.
+   golden items, and with seed 7 the first golden item only spawns after
+   36 s, when a level is long over. The runner now counts golden spawns
+   (`feel.goldens`) and a dedicated `?seed=13` run, whose first spawn is
+   golden (found by replaying the spawn RNG in node), asserts the count and
+   the live golden entity in both runners.
 4. **Z-fighting on overlays.** Promenade, wet sand, curb and shadows are thin
    planes on the ground; they sit 1–5 cm apart in height and the fog hides
    the far-distance flicker.
