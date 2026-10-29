@@ -29,7 +29,7 @@ check(stageW < 500, `desktop frame width ${stageW.toFixed(0)}px (phone-sized)`);
 // Mid-game resize: start a run, resize, confirm the fox still follows and no errors
 await page.setViewport({ width: 320, height: 568, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 await sleep(200);
-await page.tap('.btn--play'); await sleep(200);
+await page.tap('.btn--play'); await sleep(500);
 await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1800);
 await page.tap('.theme-btn[data-theme="food"]'); await sleep(500);
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });

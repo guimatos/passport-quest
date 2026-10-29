@@ -1,39 +1,44 @@
 import { Clock, easeOutCubic, easeInOutCubic, easeOutBack } from '../lib/clock';
 import { htmlToElement } from '../lib/dom';
+import { ParticleSystem } from './particles';
+
+const CREAM = '#FFF6E8';
+const CONFETTI = ['#F58324', '#7845D8', '#FFD966', '#FFF6E8', '#1FA463'];
 
 /**
- * Transient visual effects (sparkle bursts, item fly-to-wallet, toasts).
- * Every effect is a DOM node inside #fx tweened by the game clock, so they
- * pause with the game and are all removed by clear() on restart.
+ * Transient visual effects. Sparkles, trails, dust and confetti are pooled
+ * particles on one canvas (no DOM churn); item fly-to-HUD and floating labels
+ * stay DOM nodes inside #fx because they carry SVG art and text. Everything is
+ * driven by the game clock (pauses with the game) and removed by clear().
  */
 export class Fx {
-  constructor(private root: HTMLElement, private clock: Clock) {}
+  private particles: ParticleSystem;
+  /** When set (prefers-reduced-motion), particle counts are cut to a third. */
+  reduced = false;
+
+  constructor(private root: HTMLElement, canvas: HTMLCanvasElement, private clock: Clock) {
+    this.particles = new ParticleSystem(canvas);
+  }
+
+  private count(n: number) { return this.reduced ? Math.max(1, Math.ceil(n / 3)) : n; }
 
   /** Sparkle burst at a viewport position (CSS px). */
   burst(x: number, y: number, color = '#F58324', count = 10) {
-    const frag = document.createDocumentFragment();
-    const parts: { el: HTMLElement; dx: number; dy: number; r: number }[] = [];
-    for (let i = 0; i < count; i++) {
-      const el = document.createElement('i');
-      el.className = 'spark';
-      el.style.background = i % 3 === 0 ? '#FFF6E8' : color;
-      frag.appendChild(el);
-      const a = (Math.PI * 2 * i) / count + Math.random() * 0.5;
-      const d = 36 + Math.random() * 34;
-      parts.push({ el, dx: Math.cos(a) * d, dy: Math.sin(a) * d, r: Math.random() * 360 });
-    }
-    this.root.appendChild(frag);
-    this.clock.tween(620, (t) => {
-      const e = easeOutCubic(t);
-      for (const p of parts) {
-        p.el.style.transform = `translate(${x + p.dx * e}px, ${y + p.dy * e + 30 * t * t}px) rotate(${p.r + t * 180}deg) scale(${1 - t})`;
-        p.el.style.opacity = String(1 - t * t);
-      }
-    }, () => parts.forEach((p) => p.el.remove()));
+    this.particles.spawn({ x, y, count: this.count(count), speed: [60, 160], ttl: [0.4, 0.7], size: [4, 8], colors: [color, color, CREAM], gravity: 240 });
   }
 
-  /** Flies a copy of some SVG item art from one viewport point to another. */
-  fly(from: { x: number; y: number }, to: { x: number; y: number }, artMarkup: string, onDone?: () => void) {
+  /** Short sparkle trail behind a flying item. */
+  trail(x: number, y: number, color: string) {
+    this.particles.spawn({ x, y, count: this.count(2), speed: [5, 20], ttl: [0.25, 0.4], size: [3, 6], colors: [color, CREAM] });
+  }
+
+  /** Dust puff kicked up behind Capi's feet (drifts back and up). */
+  dust(x: number, y: number) {
+    this.particles.spawn({ x, y, count: 2, speed: [10, 30], ttl: [0.3, 0.5], size: [4, 8], colors: ['rgba(255,246,232,0.8)', 'rgba(228,197,124,0.8)'], shape: 2, spread: [Math.PI * 1.1, Math.PI * 1.4], vy0: -15 });
+  }
+
+  /** Flies a copy of some SVG item art from one viewport point to another, leaving a trail. */
+  fly(from: { x: number; y: number }, to: { x: number; y: number }, artMarkup: string, color: string, onDone?: () => void) {
     const el = htmlToElement(`<div class="fly"><svg viewBox="-28 -28 56 56">${artMarkup}</svg></div>`);
     this.root.appendChild(el);
     const cx = (from.x + to.x) / 2;
@@ -44,6 +49,7 @@ export class Fx {
       const y = (1 - e) * (1 - e) * from.y + 2 * (1 - e) * e * cy + e * e * to.y;
       const s = 1.25 - 0.75 * e;
       el.style.transform = `translate(${x}px, ${y}px) scale(${s}) rotate(${e * 360}deg)`;
+      if (t < 0.9) this.trail(x, y, color);
     }, () => { el.remove(); onDone?.(); });
   }
 
@@ -58,25 +64,23 @@ export class Fx {
     }, () => el.remove());
   }
 
-  /** Confetti rain for celebrations. */
+  /** Confetti rain for celebrations: rectangles released along the top edge over 0.4 s. */
   confetti(count = 28) {
-    const colors = ['#F58324', '#7845D8', '#FFD966', '#FFF6E8', '#1FA463'];
-    const w = this.root.clientWidth, h = this.root.clientHeight;
-    const parts = Array.from({ length: count }, (_, i) => {
-      const el = document.createElement('i');
-      el.className = 'confetti';
-      el.style.background = colors[i % colors.length];
-      this.root.appendChild(el);
-      return { el, x: Math.random() * w, delay: Math.random() * 0.4, drift: (Math.random() - 0.5) * 80, rot: Math.random() * 720, speed: 0.8 + Math.random() * 0.4 };
-    });
-    this.clock.tween(1800, (t) => {
-      for (const p of parts) {
-        const lt = Math.max(0, Math.min(1, (t - p.delay) / (1 - p.delay))) * p.speed;
-        p.el.style.transform = `translate(${p.x + p.drift * lt}px, ${-20 + (h + 40) * lt}px) rotate(${p.rot * lt}deg)`;
-        p.el.style.opacity = lt >= 1 ? '0' : '1';
+    const r = this.root.getBoundingClientRect();
+    const n = this.count(count);
+    const release = (k: number) => {
+      for (let i = 0; i < k; i++) {
+        this.particles.spawn({ x: r.left + Math.random() * r.width, y: r.top - 10, count: 1, speed: [20, 60], ttl: [1.6, 2.4], size: [7, 10], colors: CONFETTI, shape: 1, spread: [Math.PI * 0.25, Math.PI * 0.75], vy0: 40, gravity: 160 });
       }
-    }, () => parts.forEach((p) => p.el.remove()));
+    };
+    release(Math.ceil(n / 2));
+    this.clock.after(200, () => release(Math.floor(n / 2)));
   }
 
-  clear() { this.root.replaceChildren(); }
+  /** Advance and draw particles; dt in ms of game time. */
+  update(dt: number) { this.particles.update(dt); }
+  resize() { this.particles.resize(); }
+  get activeParticles() { return this.particles.active; }
+
+  clear() { this.root.replaceChildren(); this.particles.clear(); }
 }

@@ -129,6 +129,15 @@ export class Runner {
   toScreen(x: number, y: number) { const { s, ox, oy } = this.fit(); return { x: ox + x * s, y: oy + y * s }; }
 
   foxScreenPoint() { return this.toScreen(FOX_X, this.foxY); }
+  /** Viewport point just behind Capi's feet (for dust). Feet sit at y=58 in Capi's local space, drawn at 0.6 x depth. */
+  feetScreenPoint() { return this.toScreen(FOX_X - 4, this.foxY + 34 * this.depthScale(this.foxY)); }
+
+  /** Squash-and-stretch on a catch; restarting the class restarts the CSS animation. */
+  squash() {
+    this.foxInner.classList.remove('squash');
+    void (this.foxInner as unknown as HTMLElement).getBoundingClientRect();
+    this.foxInner.classList.add('squash');
+  }
 
   /** Depth cue: things lower on screen are closer, so slightly bigger. */
   private depthScale(y: number) {

@@ -67,6 +67,9 @@ export class Game {
   /** Dev overlay from ?perf=1; survives reset() on purpose (URL flag, not game state). */
   private perf: PerfOverlay | null = null;
   private reducedMotion: () => boolean = () => false;
+  private shakeTween: number | undefined;
+  private dustAcc = 0;
+  private wiping = false;
 
   private readonly app = $('#app');
   private readonly stage = $('#stage');
@@ -76,7 +79,7 @@ export class Game {
 
   constructor() {
     this.loop = new Loop((dt) => this.frame(dt), (paused) => this.app.classList.toggle('paused', paused));
-    this.fx = new Fx($('#fx'), this.clock);
+    this.fx = new Fx($('#fx'), $<HTMLCanvasElement>('#fx-canvas'), this.clock);
     this.hud = new Hud($('#hud'));
     if (new URLSearchParams(location.search).has('perf')) this.perf = new PerfOverlay(this.stage, this.sceneRoot);
   }
@@ -102,6 +105,11 @@ export class Game {
     this.runner = null;
     this.hud.unmount();
     clearScreen(this.overlay);
+    this.stage.style.transform = '';
+    $('#flash').classList.remove('show');
+    $('#wipe').className = '';
+    this.wiping = false;
+    this.dustAcc = 0;
     this.app.classList.remove('paused');
     this.app.dataset.state = '';
     this.state = 'start';
@@ -127,11 +135,11 @@ export class Game {
       this.loop.setPaused('hidden', hidden);
       this.music.setHidden(hidden);
     }, { signal });
-    window.addEventListener('resize', () => this.checkOrientation(), { signal });
+    window.addEventListener('resize', () => { this.checkOrientation(); this.fx.resize(); }, { signal });
     window.addEventListener('orientationchange', () => this.checkOrientation(), { signal });
 
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const applyMotion = () => this.app.classList.toggle('reduced-motion', motion.matches);
+    const applyMotion = () => { this.app.classList.toggle('reduced-motion', motion.matches); this.fx.reduced = motion.matches; };
     applyMotion();
     motion.addEventListener('change', applyMotion, { signal });
     this.reducedMotion = () => motion.matches;
@@ -145,8 +153,13 @@ export class Game {
   private frame(dt: number) {
     this.perf?.tick();
     this.clock.tick(dt);
+    this.fx.update(dt);
     if (this.runner && (this.state === 'playing' || this.state === 'redeem' || this.state === 'journal')) {
       this.runner.update(dt);
+      if (this.state === 'playing' && !this.reducedMotion()) {
+        this.dustAcc += dt;
+        if (this.dustAcc > 110) { this.dustAcc = 0; const p = this.runner.feetScreenPoint(); this.fx.dust(p.x, p.y); }
+      }
       if (this.state === 'playing' && !this.speedToastShown && this.runner.progressRamp > 0.45) {
         this.speedToastShown = true;
         this.hud.toast('Faster!', 'toast--speed');
@@ -165,7 +178,7 @@ export class Game {
   private enterStart() {
     this.setState('start');
     this.app.style.setProperty('--scene-bg', '#201338');
-    renderStart(this.overlay, () => { this.music.unlock(); this.music.play('menu'); this.enterMap(); }, this.ac.signal);
+    renderStart(this.overlay, () => { this.music.unlock(); this.music.play('menu'); this.wipeTo(() => this.enterMap()); }, this.ac.signal);
   }
 
   private mountHud() {
@@ -232,9 +245,9 @@ export class Game {
   }
 
   private startLevel(index: number, theme: ThemeId) {
-    if (this.state !== 'intro') return; // double-tap guard
+    if (this.state !== 'intro' || this.wiping) return; // double-tap guard
     this.chosen[this.destination.id] = theme;
-    this.enterPlaying(index);
+    this.wipeTo(() => this.enterPlaying(index));
   }
 
   private enterPlaying(index: number) {
@@ -279,10 +292,11 @@ export class Game {
     const isCouponItem = id === theme.coupon.itemId;
     const couponJustUnlocked = isCouponItem && count === theme.coupon.need;
 
-    this.fx.burst(screen.x, screen.y, dest.accent, 8);
+    this.runner!.squash();
+    this.fx.burst(screen.x, screen.y, dest.accent, 10);
     this.fx.floatText(screen.x, screen.y - 14, `+${POINTS_PER_ITEM}`);
     const to = first || isCouponItem ? this.hud.chipPoint(id) : this.hud.barPoint();
-    this.fx.fly(screen, to, ITEM_ART[id](), () => {
+    this.fx.fly(screen, to, ITEM_ART[id](), dest.accent, () => {
       this.hud.setCount(id, count, isCouponItem ? theme.coupon.need : undefined, isCouponItem && count >= theme.coupon.need);
       this.hud.setProgress(this.progress, dest.level.goal, 'up');
       this.addPoints(POINTS_PER_ITEM);
@@ -307,6 +321,8 @@ export class Game {
     this.hud.setProgress(this.progress, dest.level.goal, 'down');
     this.fx.floatText(screen.x, screen.y - 14, 'Ouch!', 'float-text--bad');
     this.fx.burst(screen.x, screen.y, '#201338', 6);
+    this.shake();
+    this.flash();
     this.say('Ouch! Watch out, Capi.', 1000, 'think');
   }
 
@@ -342,8 +358,8 @@ export class Game {
         if (this.state !== 'redeem') return; // double-tap guard
         this.setState('journal');
         renderJournal(this.overlay, dest, theme, this.counts, isLast, () => {
-          if (this.state !== 'journal') return;
-          if (isLast) this.enterFinal(); else this.enterMap();
+          if (this.state !== 'journal' || this.wiping) return;
+          this.wipeTo(() => { if (isLast) this.enterFinal(); else this.enterMap(); });
         }, this.ac.signal);
       }, this.ac.signal);
     });
@@ -377,6 +393,36 @@ export class Game {
   }
 
   // ---------- helpers ----------
+
+  /** Stage shake on a hit; decays over ms. Skipped under prefers-reduced-motion. */
+  private shake(strength = 6, ms = 260) {
+    if (this.reducedMotion()) return;
+    this.clock.cancel(this.shakeTween);
+    this.shakeTween = this.clock.tween(ms, (t) => {
+      const k = (1 - t) * strength;
+      this.stage.style.transform = t >= 1 ? '' : `translate(${(Math.random() - 0.5) * 2 * k}px, ${(Math.random() - 0.5) * 2 * k}px) scale(1.02)`; // scale hides the stage edges while offset
+    });
+  }
+
+  /** Brief warm flash over the scene on a hit. */
+  private flash() {
+    const el = $('#flash');
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
+
+  /** 220 ms wipe between screens: covers the stage, runs cb at the midpoint, uncovers. Input is blocked only while covered. */
+  private wipeTo(cb: () => void) {
+    if (this.wiping) return;
+    this.wiping = true;
+    const el = $('#wipe');
+    el.classList.remove('wipe-out'); el.classList.add('wipe-in');
+    this.clock.after(200, () => {
+      this.wiping = false;
+      cb();
+      el.classList.remove('wipe-in'); el.classList.add('wipe-out');
+      this.clock.after(260, () => el.classList.remove('wipe-out'));
+    });
+  }
 
   private say(text: string, ms: number, mood: 'happy' | 'cheer' | 'think' = 'happy') {
     if (this.state !== 'playing' && this.state !== 'redeem') return;
@@ -418,6 +464,8 @@ export class Game {
       toScreen: (x: number, y: number) => this.runner?.toScreen(x, y) ?? null,
       perf: this.perf?.sample ?? null,
       pool: this.runner?.poolSize() ?? 0,
+      particles: this.fx.activeParticles,
+      wiping: this.wiping,
       reducedMotion: this.reducedMotion(),
     };
   }

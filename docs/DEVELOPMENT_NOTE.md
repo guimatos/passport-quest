@@ -95,6 +95,7 @@ three runs. `?perf=1` shows the live overlay in any build.
 |---|---|---|---|---|---|---|---|---|---|
 | Stage 1 baseline (before Stage 2 work) | 60 | 24 | 0.52 | 48.5 | 7278 | 1468 | 351 | 876 | 3 |
 | + entity node pooling, cached scene rects | 60 | 23 | 0.34 | 36.9 | 5530 | 1130 | 263 | 875 | 3 |
+| + canvas particles (sparkles, trails, dust, confetti), squash, shake, flash, wipe | 60 | 22 | 0.44 | 38.8 | 5822 | 1075 | 282 | 875 | 3 |
 
 ## AI correction / rejected output — written by developer
 

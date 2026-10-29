@@ -11,7 +11,7 @@ await page.setViewport({ width: 320, height: 568, deviceScaleFactor: 2, isMobile
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 await page.goto(url, { waitUntil: 'networkidle0' });
 await page.evaluate(() => { window.__autopilot = (ms) => new Promise((res) => { const g = window.passportQuest, stage = document.getElementById('stage'); const end = performance.now() + ms; const step = () => { const d = g.debug; if (d.state !== 'playing' || performance.now() > end) return res(); const a = d.entities.filter((e) => e.x > d.fox.x - 10 && e.kind === 'item').sort((p, q) => p.x - q.x); if (a.length) { const p = d.toScreen(0, a[0].y); stage.dispatchEvent(new PointerEvent('pointermove', { clientX: 100, clientY: p.y, isPrimary: true, pointerType: 'mouse', bubbles: true })); } requestAnimationFrame(step); }; step(); }); });
-await page.tap('.btn--play'); await sleep(300); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1900); await page.tap('.theme-btn[data-theme="party"]'); await sleep(500);
+await page.tap('.btn--play'); await sleep(500); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1900); await page.tap('.theme-btn[data-theme="party"]'); await sleep(500);
 const cdp = await page.createCDPSession();
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
 await cdp.send('Performance.enable');

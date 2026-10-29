@@ -56,8 +56,10 @@ const autopilot = (ms, target) => page.evaluate((ms, t) => window.__autopilot(ms
 await shot('01-start');
 check((await state()) === 'start', 'starts on start screen');
 await page.tap('.btn--play');
-await sleep(200);
-check((await state()) === 'intro', 'play enters the map hub');
+await sleep(120);
+check((await state()) === 'start' && (await page.evaluate(() => window.passportQuest.debug.wiping)), 'play starts the screen wipe');
+await sleep(380);
+check((await state()) === 'intro', 'play enters the map hub within the wipe (<= 500 ms)');
 await sleep(400); await shot('01a-map');
 check((await page.$$('.dest-btn')).length === 2, 'map offers both destinations');
 await page.tap('.dest-btn[data-dest="brazil"]');
@@ -68,7 +70,7 @@ check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Rio'))
 check((await page.$$('.theme-btn')).length === 3, 'intro offers 3 themes');
 await page.tap('.theme-btn[data-theme="food"]');
 await page.tap('.theme-btn[data-theme="party"]').catch(() => {});
-await sleep(200);
+await sleep(500);
 check((await state()) === 'playing', 'choosing a theme enters playing (second tap ignored)');
 check((await dbg()).chosen.brazil === 'food', 'chosen theme recorded (food)');
 check((await page.$$('.chip')).length === 3, 'HUD shows the 3 items of the chosen theme');
@@ -102,6 +104,7 @@ await sleep(1500);
 await shot('04-redeem');
 const r1 = await dbg();
 check(r1.state === 'redeem', 'redeem state after completion');
+check((await page.evaluate(() => window.passportQuest.debug.particles)) > 0, 'canvas particles active (confetti) after completion');
 check(r1.progress === 16, 'progress capped at goal (16)');
 check(r1.points >= 16 * 10, `points include bonus (${r1.points})`);
 check((await page.$('.btn--continue')) !== null, 'redeem card visible');
@@ -114,12 +117,12 @@ await shot('04b-journal');
 check((await page.$$('.journal-row')).length === 3, 'journal lists the 3 themed items');
 check((await dbg()).entities.every((e) => e.kind === 'obstacle' || ['coconut', 'acai', 'brigadeiro'].includes(e.id)), 'only food-theme items spawned in Rio');
 await page.tap('.btn--continue');
-await sleep(200);
+await sleep(500);
 check((await state()) === 'intro', 'journal continue returns to the map');
 await sleep(3400); await shot('05-intro-porto');
 check(await page.$$eval('.map-marker--done', (els) => els.length) === 1, 'map shows Rio as done');
 check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Porto')), 'remaining destination auto-selected (Porto)');
-await page.tap('.theme-btn[data-theme="party"]'); await sleep(200);
+await page.tap('.theme-btn[data-theme="party"]'); await sleep(500);
 check((await state()) === 'playing' && (await dbg()).chosen.portugal === 'party', 'Porto theme chosen (party)');
 check(await page.$eval('.hud-place-name', (e) => e.textContent) === 'Porto', 'HUD shows Porto');
 await shot('06-porto');
@@ -128,7 +131,7 @@ await autopilot(90000, 'item');
 check((await state()) !== 'playing', `Portugal completed via autopilot in ${((Date.now() - t1) / 1000).toFixed(1)}s`);
 await sleep(1500);
 await page.tap('.btn--continue'); await sleep(200);
-await page.tap('.btn--continue'); await sleep(300);
+await page.tap('.btn--continue'); await sleep(500);
 check((await state()) === 'final', 'final screen');
 await shot('07-final');
 const finalPts = await page.$eval('.final-wallet strong', (e) => Number(e.textContent));
@@ -157,16 +160,16 @@ check((await state()) === 'start', 'restart from final -> start');
 
 // Repeated restarts from various states, including mid-intro, mid-redeem and mid-journal
 for (let i = 0; i < 12; i++) {
-  await page.tap('.btn--play'); await sleep(80);
+  await page.tap('.btn--play'); await sleep(350);
   if (i % 4 === 2) { await page.tap('.dest-btn[data-dest="portugal"]'); await sleep(2200); check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Porto')), `iteration ${i}: Porto chosen first`); await page.tap('.btn--restart'); await sleep(60); check((await state()) === 'start', `restart iteration ${i} -> start`); continue; }
   await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(50);
   if (i % 4 === 3) { check((await state()) === 'intro', `iteration ${i}: restart from intro`); await page.tap('.btn--restart'); await sleep(60); check((await state()) === 'start', `restart iteration ${i} -> start`); continue; }
-  await sleep(1750); await page.tap(`.theme-btn[data-theme="${['food', 'party', 'culture'][i % 3]}"]`); await sleep(80);
+  await sleep(1750); await page.tap(`.theme-btn[data-theme="${['food', 'party', 'culture'][i % 3]}"]`); await sleep(400);
   if (i % 3 === 1) {
     await autopilot(90000, 'item'); await sleep(1200);
     await page.tap('.btn--continue'); await sleep(300);
     if (i % 2 === 0) {
-      await page.tap('.btn--continue'); await sleep(300);
+      await page.tap('.btn--continue'); await sleep(500);
       check((await state()) === 'intro', `iteration ${i}: in intro`);
     } else {
       check((await state()) === 'journal', `iteration ${i}: in journal`);
@@ -178,18 +181,21 @@ for (let i = 0; i < 12; i++) {
   check((await state()) === 'start', `restart iteration ${i} -> start`);
   check(await page.$eval('#fx', (e) => e.childElementCount) === 0, `iteration ${i}: fx cleared`);
   check(await page.$eval('#scene-root', (e) => e.childElementCount) === 0, `iteration ${i}: scene cleared`);
+  check(await page.evaluate(() => window.passportQuest.debug.particles === 0 && getComputedStyle(document.getElementById('stage')).transform === 'none' && document.getElementById('wipe').className === ''), `iteration ${i}: particles cleared, shake and wipe reset`);
 }
 // prefers-reduced-motion: class applied on restart and followed live
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-await page.tap('.btn--play'); await sleep(80); await page.tap('.btn--restart'); await sleep(60);
+await page.tap('.btn--play'); await sleep(350); await page.tap('.btn--restart'); await sleep(60);
 check(await page.$eval('#app', (e) => e.classList.contains('reduced-motion')), 'reduced-motion class applied');
 check((await page.evaluate(() => window.passportQuest.debug.reducedMotion)) === true, 'reduced motion reported to the game');
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
 await sleep(50);
 check(!(await page.$eval('#app', (e) => e.classList.contains('reduced-motion'))), 'reduced-motion class removed when the preference changes');
 
-await page.tap('.btn--play'); await sleep(100); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="party"]'); await sleep(100);
+await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="party"]'); await sleep(400);
 check((await state()) === 'playing' && (await dbg()).points === 0, 'points reset after restarts');
+await autopilot(2500, 'item');
+check((await page.evaluate(() => window.passportQuest.debug.particles)) > 0, 'canvas particles active during play (dust/sparkles)');
 
 // Visibility pause: hint timer and world should not advance while hidden
 await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
