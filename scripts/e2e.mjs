@@ -111,18 +111,30 @@ await shot('03-hint');
 const d0 = await dbg();
 check((await hintVisible()) || d0.progress > 0, 'hint shown after 4s without a collection');
 
-// Hit an obstacle: progress never goes negative, points unchanged
+// Hit an obstacle: progress never goes negative, points unchanged; a hit resets the combo
 const p0 = await dbg();
-await autopilot(6000, 'obstacle');
+const comboState = () => page.evaluate(() => { const d = window.passportQuest.debug; return { combo: d.combo, mult: d.multiplier, hits: d.hits, badge: document.querySelector('.wallet-combo')?.classList.contains('show') ?? false, badgeText: document.querySelector('.wallet-combo')?.textContent ?? '' }; });
+const hunt = autopilot(6000, 'obstacle');
+let prevHits = (await comboState()).hits, sawReset = false;
+for (let i = 0; i < 55; i++) { await sleep(100); const s = await comboState(); if (s.hits > prevHits && s.combo <= 1) sawReset = true; prevHits = s.hits; } // <= 1: a catch may land in the same 100 ms sample
+await hunt;
 const p1 = await dbg();
+check(prevHits > 0 && sawReset, `a hit resets the combo (${prevHits} hits)`);
 check(p1.progress >= 0, `progress stays >= 0 after obstacle hunting (progress=${p1.progress}, was ${p0.progress})`);
 check(logs.filter((l) => l.startsWith('error')).length === 0, 'no errors during obstacle hits');
 await autopilot(5000, 'obstacle', true);
 const feel1 = await feel();
 check(feel1.dodges > 0, `dash passes through obstacles (${feel1.dodges} dodged, ${feel1.dashes} dashes)`);
 
-// Play Brazil to completion
+// Combo grows while catching: sample during a 9 s item run, then play Brazil to completion
 const t0 = Date.now();
+let probing = true;
+const probe = autopilot(9000, 'item').then(() => { probing = false; }); // resolves early if the level completes
+let maxCombo = 0, badgeSeen = false;
+while (probing) { await sleep(100); const s = await comboState(); maxCombo = Math.max(maxCombo, s.combo); if (s.mult > 1 && s.badge && s.badgeText === `x${s.mult}`) badgeSeen = true; }
+await probe;
+check(maxCombo >= 5, `combo grows while catching (max ${maxCombo})`);
+check(badgeSeen, 'combo badge shows the multiplier on the wallet');
 await autopilot(90000, 'item');
 check((await state()) !== 'playing', `Brazil completed via autopilot in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 const feel2 = await feel();
@@ -133,7 +145,7 @@ const r1 = await dbg();
 check(r1.state === 'redeem', 'redeem state after completion');
 check((await page.evaluate(() => window.passportQuest.debug.particles)) > 0, 'canvas particles active (confetti) after completion');
 check(r1.progress === 16, 'progress capped at goal (16)');
-check(r1.points >= 16 * 10, `points include bonus (${r1.points})`);
+check(r1.points >= 16 * 10 + 100, `points include multiplier gains and the completion bonus (${r1.points})`);
 check((await page.$('.btn--continue')) !== null, 'redeem card visible');
 check((await page.evaluate(() => window.passportQuest.debug.pool)) > 0, 'entity nodes are pooled and reused');
 await page.tap('.btn--continue');
@@ -211,6 +223,7 @@ for (let i = 0; i < 12; i++) {
   check(await page.evaluate(() => window.passportQuest.debug.particles === 0 && getComputedStyle(document.getElementById('stage')).transform === 'none' && document.getElementById('wipe').className === ''), `iteration ${i}: particles cleared, shake and wipe reset`);
   check(await page.evaluate(() => !window.passportQuest.debug.waterAlive && document.getElementById('water') === null), `iteration ${i}: water torn down (no canvas, no context)`);
   check((await feel()) === null, `iteration ${i}: runner gone (no dash/keyboard state)`);
+  check(await page.evaluate(() => { const d = window.passportQuest.debug; return d.combo === 0 && d.hitStop === 0 && d.dodges === 0; }), `iteration ${i}: combo, hit-stop and dodges reset`);
 }
 // prefers-reduced-motion: class applied on restart and followed live
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);

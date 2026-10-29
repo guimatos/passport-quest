@@ -1,4 +1,4 @@
-import { DESTINATIONS, POINTS_PER_ITEM, COMPLETION_BONUS, COUPON_BONUS, themeOf, type DestinationDef, type ItemId, type ThemeDef, type ThemeId } from './data/destinations';
+import { DESTINATIONS, POINTS_PER_ITEM, COMPLETION_BONUS, COUPON_BONUS, FEEL, themeOf, type DestinationDef, type ItemId, type ThemeDef, type ThemeId } from './data/destinations';
 import { ITEM_ART } from './art/items';
 import { SCENE_ART } from './art/scenes';
 import { Clock, easeInOutCubic, easeOutBack } from './lib/clock';
@@ -71,6 +71,13 @@ export class Game {
   private dustAcc = 0;
   private wiping = false;
   private wipeCount = 0; // debug counter: wipes started since the last reset
+  /** Catches since the last hit; the multiplier grows every FEEL.comboStep catches. */
+  private combo = 0;
+  /** Remaining frame-freeze time (ms): the clock and runner skip updates while > 0. */
+  private hitStop = 0;
+  private dodges = 0;
+  private hits = 0; // debug counter
+  private get multiplier() { return Math.min(FEEL.comboMax, 1 + Math.floor(this.combo / FEEL.comboStep)); }
 
   private readonly app = $('#app');
   private readonly stage = $('#stage');
@@ -112,6 +119,10 @@ export class Game {
     this.wiping = false;
     this.wipeCount = 0;
     this.dustAcc = 0;
+    this.combo = 0;
+    this.hitStop = 0;
+    this.dodges = 0;
+    this.hits = 0;
     this.app.classList.remove('paused');
     this.app.dataset.state = '';
     this.state = 'start';
@@ -154,6 +165,7 @@ export class Game {
 
   private frame(dt: number) {
     this.perf?.tick();
+    if (this.hitStop > 0) { this.hitStop -= dt; this.perf?.end(); return; } // impact frame: everything holds
     this.clock.tick(dt);
     this.fx.update(dt);
     if (this.runner && (this.state === 'playing' || this.state === 'redeem' || this.state === 'journal')) {
@@ -277,9 +289,11 @@ export class Game {
     this.hud.setDestination(dest, this.completedDests);
     this.hud.setTheme(theme);
     this.hud.setPoints(this.points);
+    this.combo = 0;
+    this.hud.setCombo(1);
     this.music.play(dest.id === 'brazil' ? 'rio' : 'porto');
     const couponItem = theme.items.find((i) => i.id === theme.coupon.itemId)!;
-    this.say(this.completedDests.length === 0 ? 'Move up and down to guide Capi!' : `${dest.name}! Faster this time.`, 2400);
+    this.say(this.completedDests.length === 0 ? 'Move up and down. Tap to dash!' : `${dest.name}! Faster this time.`, 2400);
     this.clock.after(2600, () => this.say(`Catch ${theme.coupon.need} ${couponItem.label.toLowerCase()}s for a coupon!`, 2600));
     this.armHint();
   }
@@ -290,28 +304,39 @@ export class Game {
     const dest = this.destination;
     const theme = this.theme;
     const first = !this.counts[id];
-    const count = (this.counts[id] = (this.counts[id] ?? 0) + 1);
+    const step = e.golden ? 2 : 1; // golden counts double toward the coupon (and in the journal)
+    const prevCount = this.counts[id] ?? 0;
+    const count = (this.counts[id] = prevCount + step);
     this.progress = Math.min(dest.level.goal, this.progress + 1);
     this.armHint();
 
+    const multBefore = this.multiplier;
+    this.combo++;
+    const mult = this.multiplier;
+    const gained = POINTS_PER_ITEM * mult * (e.golden ? 3 : 1);
+
     const isCouponItem = id === theme.coupon.itemId;
-    const couponJustUnlocked = isCouponItem && count === theme.coupon.need;
+    const couponJustUnlocked = isCouponItem && prevCount < theme.coupon.need && count >= theme.coupon.need;
 
     this.runner!.squash();
-    this.fx.burst(screen.x, screen.y, dest.accent, 10);
-    this.fx.floatText(screen.x, screen.y - 14, `+${POINTS_PER_ITEM}`);
+    this.fx.burst(screen.x, screen.y, e.golden ? '#FFD966' : dest.accent, e.golden ? 16 : 10);
+    this.fx.floatText(screen.x, screen.y - 14, `+${gained}`, e.golden ? 'float-text--gold' : '');
     const to = first || isCouponItem ? this.hud.chipPoint(id) : this.hud.barPoint();
     this.fx.fly(screen, to, ITEM_ART[id](), dest.accent, () => {
       this.hud.setCount(id, count, isCouponItem ? theme.coupon.need : undefined, isCouponItem && count >= theme.coupon.need);
       this.hud.setProgress(this.progress, dest.level.goal, 'up');
-      this.addPoints(POINTS_PER_ITEM);
+      this.addPoints(gained);
     });
+    if (mult > multBefore) { this.hud.setCombo(mult); this.hud.toast(`Combo x${mult}!`, 'toast--combo'); }
+    if (e.golden || couponJustUnlocked) this.hitStop = FEEL.hitStopRewardMs;
     if (couponJustUnlocked) {
       this.coupons.push(`${dest.id}:${theme.id}`);
       this.addPoints(COUPON_BONUS);
       this.hud.toast('Coupon unlocked!', 'toast--coupon');
       this.fx.confetti(18);
       this.say(`${theme.coupon.title} — yours!`, 2000);
+    } else if (e.golden) {
+      this.say('Golden! Counts double.', 1400, 'cheer');
     } else if (first) {
       this.say(DISCOVER_LINES[id], 1600);
     }
@@ -324,15 +349,33 @@ export class Game {
     const dest = this.destination;
     this.progress = Math.max(0, this.progress - dest.level.penalty);
     this.hud.setProgress(this.progress, dest.level.goal, 'down');
-    this.fx.floatText(screen.x, screen.y - 14, 'Ouch!', 'float-text--bad');
+    const lostCombo = this.multiplier > 1;
+    this.hits++;
+    this.combo = 0;
+    this.hud.setCombo(1, lostCombo);
+    this.hitStop = FEEL.hitStopHitMs;
+    this.fx.floatText(screen.x, screen.y - 14, lostCombo ? 'Combo lost!' : 'Ouch!', 'float-text--bad');
     this.fx.burst(screen.x, screen.y, '#201338', 6);
     this.shake();
     this.flash();
     this.say('Ouch! Watch out, Capi.', 1000, 'think');
   }
 
-  private dodge(_e: Entity, _screen: { x: number; y: number }) { /* Task 2: dodge rewards */ }
-  private onDash() { /* Task 2: dash effects */ }
+  /** An obstacle passed through during a dash: small reward, combo kept. */
+  private dodge(_e: Entity, screen: { x: number; y: number }) {
+    if (this.state !== 'playing') return;
+    this.dodges++;
+    this.fx.floatText(screen.x, screen.y - 14, 'Dodged!', 'float-text--dodge');
+    this.fx.burst(screen.x, screen.y, '#FFF6E8', 6);
+    this.addPoints(FEEL.dodgePoints);
+    if (this.dodges === 1) this.say('Dash through obstacles!', 1400, 'cheer');
+  }
+
+  private onDash() {
+    if (this.state !== 'playing' || this.reducedMotion()) return;
+    const p = this.runner!.foxScreenPoint();
+    this.fx.burst(p.x - 18, p.y + 16, '#FFF6E8', 5);
+  }
 
   private addPoints(n: number) {
     this.points += n;
@@ -479,6 +522,11 @@ export class Game {
       wipes: this.wipeCount,
       reducedMotion: this.reducedMotion(),
       feel: this.runner?.feel ?? null,
+      combo: this.combo,
+      multiplier: this.multiplier,
+      hitStop: this.hitStop,
+      dodges: this.dodges,
+      hits: this.hits,
     };
   }
 }

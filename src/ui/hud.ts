@@ -37,6 +37,7 @@ export class Hud {
           <span class="wallet-coin" aria-hidden="true"></span>
           <span class="wallet-points">0</span>
           <span class="wallet-label">demo pts</span>
+          <span class="wallet-combo" aria-live="polite"></span>
         </div>
       </div>
       <div class="hud-row2">
@@ -114,6 +115,16 @@ export class Hud {
       void w.offsetWidth;
       w.classList.add('pulse');
     }
+  }
+
+  /** Combo badge on the wallet: hidden at x1, pops when it grows, shakes away when lost. */
+  setCombo(mult: number, lost = false) {
+    const el = $('.wallet-combo', this.root);
+    el.textContent = `x${mult}`;
+    el.classList.remove('pop', 'lost');
+    void el.offsetWidth;
+    el.classList.toggle('show', mult > 1);
+    el.classList.add(lost ? 'lost' : 'pop');
   }
 
   /** Big short-lived label in the middle of the screen ("Faster!", "Coupon unlocked!"). */
