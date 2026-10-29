@@ -14,6 +14,8 @@ const OBSTACLE_RADIUS = 18;
 const SPAWN_X = SCENE_W + 70;
 const DESPAWN_X = -80;
 const FOLLOW_RATE = 11; // per second; higher = snappier follow
+const FOX_SCALE = 0.72; // was 0.6: Capi is the hero and should outweigh the items
+const LEAN_MAX = 14; // degrees, toward the direction of vertical travel
 const POOL_MAX = 12; // pooled nodes kept per kind:id
 
 export interface Entity {
@@ -52,6 +54,10 @@ export class Runner {
   private entityLayer: SVGGElement;
   private foxG: SVGGElement;
   private foxInner: SVGGElement;
+  private leanG: SVGGElement;
+  private lean = 0;
+  /** Set by the game from prefers-reduced-motion: no lane lean. */
+  reducedMotion = false;
   private hintG: SVGGElement;
   private entities: Entity[] = [];
   private foxY: number;
@@ -93,7 +99,7 @@ export class Runner {
         <g class="backdrop">${variant?.backdrop ?? art.backdrop}</g>
         ${layers.map((l) => layerMarkup(l, 'layer-back')).join('')}
         <g class="entities"></g>
-        <g class="runner-root"><ellipse class="runner-shadow" cy="46" rx="44" ry="8" fill="#201338" opacity="0.18"/><g class="runner-inner">${capyGroup('run', theme.costume)}</g></g>
+        <g class="runner-root"><ellipse class="runner-shadow" cy="46" rx="44" ry="8" fill="#201338" opacity="0.18"/><g class="runner-lean"><g class="runner-inner">${capyGroup('run', theme.costume)}</g></g></g>
         ${art.front.map((l) => layerMarkup(l, 'layer-front')).join('')}
         <g class="hint-hand" visibility="hidden">
           <g class="hint-hand-inner">
@@ -108,6 +114,7 @@ export class Runner {
     this.entityLayer = this.el.querySelector('.entities')!;
     this.foxG = this.el.querySelector('.runner-root')!;
     this.foxInner = this.el.querySelector('.runner-inner')!;
+    this.leanG = this.el.querySelector('.runner-lean')!;
     this.hintG = this.el.querySelector('.hint-hand')!;
     this.placeFox();
 
@@ -163,8 +170,8 @@ export class Runner {
   toScreen(x: number, y: number) { const { s, ox, oy } = this.fit(); return { x: ox + x * s, y: oy + y * s }; }
 
   foxScreenPoint() { return this.toScreen(FOX_X, this.foxY); }
-  /** Viewport point just behind Capi's feet (for dust). Feet sit at y=58 in Capi's local space, drawn at 0.6 x depth. */
-  feetScreenPoint() { return this.toScreen(FOX_X - 4, this.foxY + 34 * this.depthScale(this.foxY)); }
+  /** Viewport point just behind Capi's feet (for dust). Feet sit at y=58 in Capi's local space, drawn at FOX_SCALE x depth. */
+  feetScreenPoint() { return this.toScreen(FOX_X - 4, this.foxY + 58 * FOX_SCALE * this.depthScale(this.foxY)); }
 
   /** Squash-and-stretch on a catch; restarting the class restarts the CSS animation. */
   squash() {
@@ -180,7 +187,8 @@ export class Runner {
   }
 
   private placeFox() {
-    this.foxG.setAttribute('transform', `translate(${FOX_X} ${this.foxY}) scale(${this.depthScale(this.foxY) * 0.6})`);
+    this.foxG.setAttribute('transform', `translate(${FOX_X} ${this.foxY}) scale(${this.depthScale(this.foxY) * FOX_SCALE})`);
+    this.leanG.setAttribute('transform', `rotate(${this.lean.toFixed(1)} 0 24)`);
     this.hintG.setAttribute('transform', `translate(${FOX_X + 70} ${this.foxY})`);
   }
 
@@ -220,7 +228,12 @@ export class Runner {
 
     // Fox follows target (exponential smoothing, frame-rate independent)
     const k = 1 - Math.exp(-FOLLOW_RATE * sec);
+    const prevY = this.foxY;
     this.foxY += (this.targetY - this.foxY) * k;
+    // Lane lean: tilt toward the direction of vertical travel, smoothed so it reads as weight, not jitter.
+    const vy = sec > 0 ? (this.foxY - prevY) / sec : 0;
+    const targetLean = this.reducedMotion ? 0 : Math.max(-LEAN_MAX, Math.min(LEAN_MAX, vy * 0.03));
+    this.lean += (targetLean - this.lean) * (1 - Math.exp(-10 * sec));
     this.placeFox();
     if (this.stunned > 0) {
       this.stunned -= dt;
@@ -315,7 +328,8 @@ export class Runner {
     if (!el) {
       el = document.createElementNS(SVG_NS, 'g');
       el.setAttribute('class', `entity entity--${kind} entity--${id}`);
-      el.innerHTML = `<g class="entity-anim"><g class="entity-art" transform="scale(${scale})">${markup}</g></g>`;
+      // The shadow sits outside .entity-anim so the bob does not move it; the outer depth scale still applies.
+      el.innerHTML = `<ellipse class="entity-shadow" cy="26" rx="17" ry="4" fill="#201338" opacity="0.16"/><g class="entity-anim"><g class="entity-art" transform="scale(${scale})">${markup}</g></g>`;
     }
     el.classList.toggle('entity--golden', golden);
     el.setAttribute('transform', `translate(${x} ${y}) scale(${this.depthScale(y)})`);

@@ -82,6 +82,8 @@ await sleep(500);
 check((await state()) === 'playing', 'choosing a theme enters playing (second tap ignored)');
 check((await dbg()).chosen.brazil === 'food', 'chosen theme recorded (food)');
 check((await page.$$('.chip')).length === 3, 'HUD shows the 3 items of the chosen theme');
+check(await page.$eval('.hud-toast', (e) => getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)'), 'toast has a solid backing');
+check((await page.$$('.runner-lean')).length === 1 && (await page.$$('.backdrop rect[fill$="-shade)"]')).length === 1, 'lane-lean group and band shade present');
 check(await page.evaluate(() => window.passportQuest.debug.waterAlive), 'WebGL water active');
 check(await page.$eval('.water-rect', (e) => getComputedStyle(e).display === 'none'), 'SVG water rect hidden under the shader');
 await shot('02-brazil');

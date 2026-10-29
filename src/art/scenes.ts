@@ -55,6 +55,17 @@ export function sceneLayers(art: SceneArt, theme: ThemeId): ParallaxLayer[] {
 
 // ---------- shared pieces ----------
 
+/**
+ * Depth cues for the play band: a shade that darkens toward the bottom edge
+ * (closer = heavier) and a light haze along the horizon line. Painted after
+ * the ground rect of each backdrop; gradient ids must be unique per backdrop.
+ */
+const bandDepth = (id: string, top: number, height: number, hazeOpacity = 0.35, shadeOpacity = 0.16) => `
+      <linearGradient id="${id}-shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#201338" stop-opacity="0"/><stop offset="1" stop-color="#201338" stop-opacity="${shadeOpacity}"/></linearGradient>
+      <linearGradient id="${id}-haze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF6E8" stop-opacity="${hazeOpacity}"/><stop offset="1" stop-color="#FFF6E8" stop-opacity="0"/></linearGradient>
+      <rect y="${top}" width="360" height="${height}" fill="url(#${id}-shade)"/>
+      <rect y="${top}" width="360" height="48" fill="url(#${id}-haze)"/>`;
+
 const palm = (x: number, y: number, h: number, lean = 0, s = 1) => `
   <g class="palm" transform="translate(${x} ${y}) scale(${s})">
     <path d="M0 0 Q${lean * 0.5} ${-h * 0.5} ${lean} ${-h}" stroke="#8B5A2B" stroke-width="11" fill="none" stroke-linecap="round"/>
@@ -209,6 +220,7 @@ export const SCENE_ART: Record<DestinationId, SceneArt> = {
       <rect class="water-rect" y="330" width="360" height="70" fill="url(#rio-sea)"/>
       <rect y="396" width="360" height="324" fill="url(#rio-sand)"/>
       <path d="M0 400 Q90 392 180 400 T360 400 L360 410 L0 410 Z" fill="#FFF6E8" opacity="0.8"/>
+      ${bandDepth('rio', 396, 324)}
     `,
     layers: [
       // Clouds + far birds
@@ -288,7 +300,8 @@ export const SCENE_ART: Record<DestinationId, SceneArt> = {
           <circle cx="284" cy="120" r="30" fill="#FFF0C2"/><circle cx="296" cy="112" r="26" fill="#4B2A8C" opacity="0.9"/>
           <rect class="water-rect" y="330" width="360" height="70" fill="url(#rio-nsea)"/>
           <rect y="396" width="360" height="324" fill="url(#rio-nsand)"/>
-          <path d="M0 400 Q90 392 180 400 T360 400 L360 410 L0 410 Z" fill="#FFF6E8" opacity="0.6"/>`,
+          <path d="M0 400 Q90 392 180 400 T360 400 L360 410 L0 410 Z" fill="#FFF6E8" opacity="0.6"/>
+          ${bandDepth('rio-n', 396, 324, 0.18, 0.22)}`,
       },
       culture: {
         sky: { speed: 0.14, width: 1080, markup: `<g transform="translate(112 318)"><g class="cabin"><path d="M0 -14 v14" stroke="#201338" stroke-width="2"/><rect x="-10" y="0" width="20" height="14" rx="3" fill="#F58324"/><rect x="-7" y="3" width="6" height="6" fill="#9ED5F5"/><rect x="1" y="3" width="6" height="6" fill="#9ED5F5"/></g></g>` },
@@ -316,6 +329,7 @@ export const SCENE_ART: Record<DestinationId, SceneArt> = {
       <rect width="360" height="616" fill="url(#porto-sky)"/>
       <circle cx="70" cy="150" r="30" fill="#FFE8A8" opacity="0.9"/>
       <rect y="380" width="360" height="236" fill="url(#porto-quay)"/>
+      ${bandDepth('porto', 380, 236)}
       <rect class="water-rect" y="612" width="360" height="108" fill="url(#porto-river)"/>
     `,
     layers: [
@@ -404,6 +418,7 @@ export const SCENE_ART: Record<DestinationId, SceneArt> = {
           <g fill="#FFF6E8"><circle cx="30" cy="40" r="1.2"/><circle cx="90" cy="70" r="1"/><circle cx="150" cy="30" r="1.5"/><circle cx="230" cy="60" r="1"/><circle cx="300" cy="40" r="1.3"/><circle cx="340" cy="110" r="1"/><circle cx="60" cy="130" r="1"/></g>
           <circle cx="70" cy="140" r="26" fill="#FFF0C2"/>
           <rect y="380" width="360" height="236" fill="url(#porto-nquay)"/>
+          ${bandDepth('porto-n', 380, 236, 0.18, 0.22)}
           <rect y="612" width="360" height="108" fill="url(#porto-nriver)"/>`,
         sky: { speed: 0.1, width: 900, markup: `
           ${firework(120, 90, '#F58324')}${firework(300, 60, '#F2C94C', 'fw-b')}${firework(520, 110, '#7FE3A8', 'fw-c')}${firework(720, 70, '#F7A0C3', 'fw-b')}

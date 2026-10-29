@@ -152,7 +152,7 @@ export class Game {
     window.addEventListener('orientationchange', () => this.checkOrientation(), { signal });
 
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const applyMotion = () => { this.app.classList.toggle('reduced-motion', motion.matches); this.fx.reduced = motion.matches; };
+    const applyMotion = () => { this.app.classList.toggle('reduced-motion', motion.matches); this.fx.reduced = motion.matches; if (this.runner) this.runner.reducedMotion = motion.matches; };
     applyMotion();
     motion.addEventListener('change', applyMotion, { signal });
     this.reducedMotion = () => motion.matches;
@@ -284,6 +284,7 @@ export class Game {
     }, this.random, this.ac.signal, this.stage);
     this.sceneRoot.appendChild(this.runner.el);
     if (this.runner.water) this.runner.water.static = this.reducedMotion();
+    this.runner.reducedMotion = this.reducedMotion();
 
     this.mountHud();
     this.hud.setDestination(dest, this.completedDests);
