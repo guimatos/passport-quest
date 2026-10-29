@@ -1,11 +1,11 @@
 import { FEEL, type DestinationDef, type ItemId, type ObstacleId, type ThemeDef } from '../data/destinations';
-import { SCENE_ART } from '../art/scenes';
 import type { CapyMood } from '../art/capy';
 import { svgFromString } from '../lib/dom';
 import { mat4, multiply, perspective, lookAt, trs, clamp, lerp, type Mat4 } from '../gl/math';
-import { MeshBuilder, hex, mix, type RGB } from '../gl/mesh';
-import { Renderer, makeMesh, type Mesh, type Env } from '../gl/renderer';
+import { hex, type RGB } from '../gl/mesh';
+import { Renderer, type Mesh } from '../gl/renderer';
 import { buildCapi, buildItem, buildObstacle, buildShadow, type CapiMeshes } from './models';
+import { buildWorld, CHUNK_LEN, CHUNKS_VISIBLE, CHUNK_NEAR_Z, WRAP, type World } from './world';
 import { pickWeighted, pickPattern, type Entity, type RunnerApi, type RunnerHandlers, type SpawnPattern, type LiveEntity } from '../scene/types';
 
 /** Lateral half-width of the play band (world units). */
@@ -73,6 +73,7 @@ export class Runner3D implements RunnerApi {
   private dashCooldown = 0;
   private dashes = 0;
   private dodges = 0;
+  private goldens = 0;
   private squashT = 0;
   private mood: CapyMood = 'run';
   private keys = new Set<string>();
@@ -80,10 +81,10 @@ export class Runner3D implements RunnerApi {
   private itemMeshes = new Map<string, Mesh>();
   private capi: CapiMeshes;
   private shadow: Mesh;
-  private ground: Mesh;
-  private sky: Mesh;
-  private groundOffset = 0;
-  private env: Env;
+  private world: World;
+  /** Scenery scroll inside the current chunk, and which variant the nearest chunk shows. */
+  private scroll = 0;
+  private chunkCycle = 0;
   private proj = mat4();
   private view = mat4();
   private m = mat4();
@@ -113,23 +114,7 @@ export class Runner3D implements RunnerApi {
 
     this.capi = buildCapi(theme.costume);
     this.shadow = buildShadow();
-    const art = SCENE_ART[dest.id];
-    const night = !!art.variants[theme.id]?.bg;
-    const sand = dest.id === 'brazil' ? hex('#F2DEA6') : hex('#B8B1A3');
-    const g = new MeshBuilder();
-    g.plane(140, 160, sand, { p: [0, -0.02, -60] });
-    g.plane(2 * BAND_HALF + 1.2, 160, sand, { p: [0, 0, -60] }, 1, 1, 40, (_ix, iz) => (iz % 2 ? mix(sand, hex('#201338'), 0.06) : sand));
-    this.ground = makeMesh(g.build());
-    const skyTop = night ? hex('#1A1040') : (dest.id === 'brazil' ? hex('#3FB3EE') : hex('#7FA7E8'));
-    const horizon = night ? hex(dest.id === 'brazil' ? '#8A4FA8' : '#7A3F6E') : (dest.id === 'brazil' ? hex('#CDEFFB') : hex('#FFE1B8'));
-    const s = new MeshBuilder();
-    const strips = 14;
-    for (let i = 0; i < strips; i++) {
-      const y0 = -40 + (i / strips) * 200, y1 = -40 + ((i + 1) / strips) * 200;
-      s.quad([-400, y0, -150], [400, y0, -150], [400, y1, -150], [-400, y1, -150], mix(horizon, skyTop, Math.pow(i / (strips - 1), 0.7)), 0);
-    }
-    this.sky = makeMesh(s.build());
-    this.env = { horizon, light: [-0.5, 1, 0.6], ambient: night ? 0.5 : 0.62, fogNear: 30, fogFar: 120 };
+    this.world = buildWorld(dest, theme);
 
     // Pointer control: Capi follows the pointer's horizontal position; a quick tap is a dash.
     let downAt = 0, downX = 0, downY = 0;
@@ -179,7 +164,9 @@ export class Runner3D implements RunnerApi {
   feetScreenPoint() { return this.projectPoint(this.capiX, 0.05, 0.3); }
   get foxPosition() { return { x: this.capiX, y: 0 }; }
   liveEntities(): LiveEntity[] { return this.entities.filter((e) => !e.done).map((e) => ({ kind: e.kind, id: e.id, x: e.x, y: -e.z, golden: e.golden })); }
-  get feel() { return { dashes: this.dashes, dodges: this.dodges, dashing: this.dashLeft > 0, cooldown: this.dashCooldown > 0, patterns: [...this.patternsSeen] }; }
+  get feel() { return { dashes: this.dashes, dodges: this.dodges, dashing: this.dashLeft > 0, cooldown: this.dashCooldown > 0, patterns: [...this.patternsSeen], goldens: this.goldens }; }
+  /** Debug: which world variant is loaded, e.g. `brazil:party:night`. */
+  get worldName() { return this.world.name; }
   poolSize() { return this.itemMeshes.size; }
 
   squash() { this.squashT = 300; }
@@ -205,7 +192,15 @@ export class Runner3D implements RunnerApi {
     this.elapsedTotal += dt;
     if (!this.finished) this.elapsed += dt;
     const speed = this.worldSpeed;
-    this.groundOffset = (this.groundOffset + speed * sec) % 8;
+    this.scroll += speed * sec;
+    while (this.scroll >= CHUNK_LEN) { this.scroll -= CHUNK_LEN; this.chunkCycle = (this.chunkCycle + 1) % this.world.chunks.length; }
+    for (const mv of this.world.movers) {
+      if (mv.scroll) { mv.z += (speed + (mv.boost ?? 0)) * sec; if (mv.z > CHUNK_NEAR_Z + 4) mv.z -= WRAP; }
+      if (!this.reducedMotion) {
+        if (mv.drift) { mv.x += mv.drift * sec; if (mv.x > 90) mv.x = -90; }
+        if (mv.rise) { mv.y += mv.rise * sec; if (mv.y > (mv.riseMax ?? 20)) mv.y = 2; }
+      }
+    }
 
     if (!this.finished) {
       if (this.keys.has('ArrowLeft')) this.targetX = clamp(this.targetX - KEY_SPEED * sec, -BAND_HALF, BAND_HALF);
@@ -281,6 +276,7 @@ export class Runner3D implements RunnerApi {
         : pattern === 'zigzag' ? (i % 2 ? PATTERN_SPREAD : -PATTERN_SPREAD) * dir
         : 0;
       const golden = isSignature && this.random() < FEEL.goldChance;
+      if (golden) this.goldens++;
       this.addEntity('item', def.id, clamp(x + dx, -BAND_HALF, BAND_HALF), SPAWN_Z - i * ROW_SPACING, def.scale ?? 1, golden);
     }
   }
@@ -294,7 +290,7 @@ export class Runner3D implements RunnerApi {
 
   private addEntity(kind: Entity['kind'], id: ItemId | ObstacleId, x: number, z: number, scale: number, golden = false) {
     const h = kind === 'item' ? ITEM_HEIGHT : id === 'gull' ? 0.9 : 0;
-    this.entities.push({ kind, id, x, z, h, mesh: this.meshFor(kind, id), scale: scale * (kind === 'item' ? 1.1 : 1), phase: this.random() * Math.PI * 2, anim: 'live', t: 0, done: false, golden });
+    this.entities.push({ kind, id, x, z, h, mesh: this.meshFor(kind, id), scale: scale * (kind === 'item' ? 1.35 : 1.15), phase: this.random() * Math.PI * 2, anim: 'live', t: 0, done: false, golden });
   }
 
   // ---------- rendering ----------
@@ -306,10 +302,26 @@ export class Runner3D implements RunnerApi {
     const camX = this.capiX * 0.4;
     const bob = this.reducedMotion ? 0 : Math.sin(t * 9) * 0.03;
     perspective(this.proj, 64 * Math.PI / 180, r.aspect, 0.5, 170);
-    lookAt(this.view, [camX, 4.2 + bob, 7.4], [camX, 0.9, -9]);
-    r.begin(this.proj, this.view, this.env, this.reducedMotion ? 0 : t);
-    r.draw(this.sky, trs(this.m, camX, 0, 0), { unlit: true });
-    r.draw(this.ground, trs(this.m, 0, 0, this.groundOffset));
+    lookAt(this.view, [camX, 4.8 + bob, 8.6], [camX, 0.8, -10]);
+    const w = this.world;
+    r.begin(this.proj, this.view, w.env, this.reducedMotion ? 0 : t);
+    r.draw(w.sky, trs(this.m, camX, 0, 0), { unlit: true });
+    r.draw(w.base, trs(this.m, 0, 0, 0));
+    r.draw(w.far, trs(this.m, 0, 0, 0));
+    if (w.water) r.draw(w.water, trs(this.m, 0, 0, 0), { wave: this.reducedMotion ? 0 : w.waterWave });
+    for (let i = 0; i < CHUNKS_VISIBLE; i++) {
+      const mesh = w.chunks[(i + this.chunkCycle) % w.chunks.length];
+      r.draw(mesh, trs(this.m, 0, 0, CHUNK_NEAR_Z - i * CHUNK_LEN + this.scroll));
+    }
+    for (const mv of w.movers) {
+      let x = mv.x, y = mv.y, z = mv.z;
+      if (mv.path) {
+        const u = this.reducedMotion ? 0.5 : (t / mv.path.period) % 1, k = u < 0.5 ? u * 2 : 2 - u * 2;
+        x = lerp(mv.path.from[0], mv.path.to[0], k); y = lerp(mv.path.from[1], mv.path.to[1], k); z = lerp(mv.path.from[2], mv.path.to[2], k);
+      }
+      if (mv.bob && !this.reducedMotion) y += Math.sin(t * 1.3 + mv.phase) * mv.bob;
+      r.draw(mv.mesh, trs(this.m, x, y, z, 0, mv.rotY, 0, mv.scale), mv.unlit ? { unlit: true } : {});
+    }
 
     // Ground shadows (blended) then entities
     for (const e of this.entities) {

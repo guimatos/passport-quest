@@ -32,7 +32,7 @@ export type SpawnPattern = 'single' | 'row' | 'arc' | 'zigzag';
  */
 export interface LiveEntity { kind: Entity['kind']; id: Entity['id']; x: number; y: number; golden: boolean }
 
-export interface RunnerFeel { dashes: number; dodges: number; dashing: boolean; cooldown: boolean; patterns: SpawnPattern[] }
+export interface RunnerFeel { dashes: number; dodges: number; dashing: boolean; cooldown: boolean; patterns: SpawnPattern[]; /** Golden signature items spawned so far. */ goldens: number }
 
 export interface RunnerApi {
   readonly mode: '2d' | '3d';

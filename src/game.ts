@@ -539,6 +539,7 @@ export class Game {
       mode: this.runner?.mode ?? null,
       gl: this.runner?.stats.gl ?? false,
       draws: this.runner?.stats.draws ?? 0,
+      world: this.runner instanceof Runner3D ? this.runner.worldName : null,
       wiping: this.wiping,
       wipes: this.wipeCount,
       reducedMotion: this.reducedMotion(),

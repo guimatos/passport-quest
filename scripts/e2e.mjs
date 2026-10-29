@@ -72,6 +72,7 @@ if (MODE === '2d') {
   check((await page.$('.scene--3d canvas.gl')) !== null && (await page.evaluate(() => window.passportQuest.debug.gl)), '3D runner: WebGL canvas present and context alive');
   check((await page.evaluate(() => window.passportQuest.debug.draws)) > 10, `3D runner draws the scene (${await page.evaluate(() => window.passportQuest.debug.draws)} draw calls last frame)`);
   check(await page.$eval('.hud-bubble', (e) => e.textContent.includes('left and right') || e.textContent.includes('coupon')), 'fox hint speaks of left and right in 3D');
+  check((await page.evaluate(() => window.passportQuest.debug.world)) === 'brazil:food:day', 'Rio Food loads the day world');
 }
 await shot('02-brazil');
 
@@ -133,12 +134,13 @@ check(feel1.dodges > 0, `dash passes through obstacles (${feel1.dodges} dodged, 
 const t0 = Date.now();
 let probing = true;
 const probe = autopilot(9000, 'item').then(() => { probing = false; }); // resolves early if the level completes
-let maxCombo = 0, badgeSeen = false;
-while (probing) { await sleep(100); const s = await comboState(); maxCombo = Math.max(maxCombo, s.combo); if (s.mult > 1 && s.badge && s.badgeText === `x${s.mult}`) badgeSeen = true; }
+let maxCombo = 0, badgeSeen = false, goldenSeen = false;
+while (probing) { await sleep(100); const s = await comboState(); maxCombo = Math.max(maxCombo, s.combo); if (s.mult > 1 && s.badge && s.badgeText === `x${s.mult}`) badgeSeen = true; if (!goldenSeen) goldenSeen = await page.evaluate(() => window.passportQuest.debug.entities.some((e) => e.golden)); }
 await probe;
 check(maxCombo >= 5, `combo grows while catching (max ${maxCombo})`);
 check(badgeSeen, 'combo badge shows the multiplier on the wallet');
 await autopilot(90000, 'item');
+goldenSeen = goldenSeen || (await feel()).goldens > 0; // counted by the runner, so no sampling gap
 check((await state()) !== 'playing', `Brazil completed via autopilot in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 const feel2 = await feel();
 check(feel2.patterns.length >= 3, `spawn patterns seen: ${feel2.patterns.join(', ')}`);
@@ -168,9 +170,12 @@ await page.tap('.theme-btn[data-theme="party"]'); await sleep(500);
 check((await state()) === 'playing' && (await dbg()).chosen.portugal === 'party', 'Porto theme chosen (party)');
 check(await page.$eval('.hud-place-name', (e) => e.textContent) === 'Porto', 'HUD shows Porto');
 await shot('06-porto');
+if (MODE === '3d') check((await page.evaluate(() => window.passportQuest.debug.world)) === 'portugal:party:night', 'Porto Party loads the night world');
 const t1 = Date.now();
 await autopilot(90000, 'item');
 check((await state()) !== 'playing', `Portugal completed via autopilot in ${((Date.now() - t1) / 1000).toFixed(1)}s`);
+goldenSeen = goldenSeen || (await feel()).goldens > 0;
+check(goldenSeen, 'a golden signature item spawned during the trip');
 await sleep(1500);
 await page.tap('.btn--continue'); await sleep(200);
 await page.tap('.btn--continue'); await sleep(500);

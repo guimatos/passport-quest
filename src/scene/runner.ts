@@ -62,6 +62,7 @@ export class Runner implements RunnerApi {
   private dashCooldown = 0;
   private dashes = 0;
   private dodges = 0;
+  private goldens = 0;
   private keys = new Set<string>();
   private patternsSeen = new Set<SpawnPattern>();
   /** WebGL water under the SVG, or null when unavailable (SVG gradient shows instead). */
@@ -297,6 +298,7 @@ export class Runner implements RunnerApi {
         : pattern === 'zigzag' ? (i % 2 ? 70 : -70) * dir
         : 0;
       const golden = isSignature && this.random() < FEEL.goldChance;
+      if (golden) this.goldens++;
       this.addEntity('item', def.id, SPAWN_X + i * 64, this.clampY(y + dy), def.scale ?? 1, ITEM_ART[def.id](), golden);
     }
   }
@@ -333,7 +335,7 @@ export class Runner implements RunnerApi {
   liveEntities(): LiveEntity[] { return this.entities.filter((e) => !e.done).map((e) => ({ kind: e.kind, id: e.id, x: e.x, y: e.y, golden: e.golden })); }
   get foxPosition() { return { x: FOX_X, y: this.foxY }; }
   /** Debug/test accessor: dash, dodge and spawn-pattern counters. */
-  get feel() { return { dashes: this.dashes, dodges: this.dodges, dashing: this.dashLeft > 0, cooldown: this.dashCooldown > 0, patterns: [...this.patternsSeen] }; }
+  get feel() { return { dashes: this.dashes, dodges: this.dodges, dashing: this.dashLeft > 0, cooldown: this.dashCooldown > 0, patterns: [...this.patternsSeen], goldens: this.goldens }; }
 
   setMood(mood: CapyMood) {
     this.foxInner.innerHTML = capyGroup(mood, this.theme.costume);

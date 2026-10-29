@@ -14,6 +14,8 @@ export interface Env {
   horizon: RGB;
   light: [number, number, number];
   ambient: number;
+  /** Multiplies lit colours (night scenes dim the world without touching the palette). */
+  intensity?: number;
   fogNear: number;
   fogFar: number;
 }
@@ -34,12 +36,12 @@ void main(){
 const FRAG = `precision mediump float;
 varying vec4 vCol; varying float vFog; varying vec3 vNrm;
 uniform vec3 uLight; uniform float uAmbient; uniform vec3 uFogCol; uniform vec2 uFogRange;
-uniform vec4 uTint; uniform float uAlpha; uniform float uUnlit;
+uniform vec4 uTint; uniform float uAlpha; uniform float uUnlit; uniform float uIntensity;
 void main(){
   vec3 n = normalize(vNrm);
   float d = max(dot(n, uLight), 0.0);
   float lit = vCol.a * (1.0 - uUnlit);
-  float l = mix(1.0, uAmbient + (1.0 - uAmbient) * d, lit);
+  float l = mix(1.0, (uAmbient + (1.0 - uAmbient) * d) * uIntensity, lit);
   vec3 col = mix(vCol.rgb * l, uTint.rgb, uTint.a);
   float f = clamp((vFog - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0) * (1.0 - uUnlit);
   col = mix(col, uFogCol, f);
@@ -92,7 +94,7 @@ export class Renderer {
     gl.useProgram(prog);
     this.attr = { pos: gl.getAttribLocation(prog, 'aPos'), nrm: gl.getAttribLocation(prog, 'aNrm'), col: gl.getAttribLocation(prog, 'aCol') };
     gl.enableVertexAttribArray(this.attr.pos); gl.enableVertexAttribArray(this.attr.nrm); gl.enableVertexAttribArray(this.attr.col);
-    for (const n of ['uProj', 'uView', 'uModel', 'uTime', 'uWave', 'uLight', 'uAmbient', 'uFogCol', 'uFogRange', 'uTint', 'uAlpha', 'uUnlit']) this.u[n] = gl.getUniformLocation(prog, n);
+    for (const n of ['uProj', 'uView', 'uModel', 'uTime', 'uWave', 'uLight', 'uAmbient', 'uFogCol', 'uFogRange', 'uTint', 'uAlpha', 'uUnlit', 'uIntensity']) this.u[n] = gl.getUniformLocation(prog, n);
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
     gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -123,6 +125,7 @@ export class Renderer {
     const l = env.light, len = Math.hypot(l[0], l[1], l[2]) || 1;
     gl.uniform3f(this.u.uLight, l[0] / len, l[1] / len, l[2] / len);
     gl.uniform1f(this.u.uAmbient, env.ambient);
+    gl.uniform1f(this.u.uIntensity, env.intensity ?? 1);
     gl.uniform3f(this.u.uFogCol, env.horizon[0], env.horizon[1], env.horizon[2]);
     gl.uniform2f(this.u.uFogRange, env.fogNear, env.fogFar);
     gl.uniform1f(this.u.uTime, time);

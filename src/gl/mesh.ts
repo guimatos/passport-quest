@@ -56,7 +56,7 @@ export class MeshBuilder {
   }
 
   /** Cylinder (or cone when rTop = 0) along +y, centred on the origin. */
-  cyl(rBottom: number, rTop: number, h: number, segs: number, col: RGB, t?: Placement, lit = 1, caps = true) {
+  cyl(rBottom: number, rTop: number, h: number, segs: number, col: RGB, t?: Placement, lit = 1, caps = true, alt?: RGB) {
     const m = placementMatrix(t);
     const y0 = -h / 2, y1 = h / 2;
     for (let i = 0; i < segs; i++) {
@@ -64,7 +64,7 @@ export class MeshBuilder {
       const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
       const b0: P3 = [c0 * rBottom, y0, s0 * rBottom], b1: P3 = [c1 * rBottom, y0, s1 * rBottom];
       const t0: P3 = [c0 * rTop, y1, s0 * rTop], t1: P3 = [c1 * rTop, y1, s1 * rTop];
-      const sideCol = shade(col, 0.86 + 0.14 * Math.abs(Math.cos(a0 + 0.4)));
+      const sideCol = alt && i % 2 ? alt : shade(col, 0.86 + 0.14 * Math.abs(Math.cos(a0 + 0.4)));
       if (rTop > 0) this.quad(b1, b0, t0, t1, sideCol, lit, m); else this.tri(b1, b0, t0, sideCol, lit, m);
       if (caps) {
         if (rBottom > 0) this.tri([0, y0, 0], b0, b1, shade(col, 0.7), lit, m);
