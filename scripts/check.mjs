@@ -1,4 +1,4 @@
-// Runs every gate in order: typecheck, build, bundle budget, static preview server, e2e at two sizes,
+// Runs every gate in order: typecheck, build, bundle budget, static preview server, e2e at two sizes (3D) and once in 2D,
 // layout checks, perf measurement (printed, never fails the run). Exits non-zero on the first red step.
 // Usage: npm run check   (CHROME_PATH=/path/to/chrome overrides the browser used by the scripts)
 import { spawn, spawnSync } from 'node:child_process';
@@ -35,6 +35,7 @@ try {
   await up();
   run('node', ['scripts/e2e.mjs', url, '320', '568']);
   run('node', ['scripts/e2e.mjs', url, '390', '844']);
+  run('node', ['scripts/e2e.mjs', url, '320', '568'], { MODE: '2d' }); // the SVG fallback runner
   run('node', ['scripts/layoutcheck.mjs', url]);
   console.log('\n$ node scripts/perfcheck.mjs (informational)');
   spawnSync('node', ['scripts/perfcheck.mjs', url, '8'], { stdio: 'inherit' });

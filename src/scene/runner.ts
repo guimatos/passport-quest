@@ -4,6 +4,9 @@ import { SCENE_ART, WATER, sceneLayers, type ParallaxLayer } from '../art/scenes
 import { Water } from './water';
 import { capyGroup, type CapyMood } from '../art/capy';
 import { svgFromString, SVG_NS } from '../lib/dom';
+import { pickWeighted, pickPattern, type Entity, type RunnerApi, type RunnerHandlers, type SpawnPattern, type LiveEntity } from './types';
+
+export type { Entity, RunnerHandlers, SpawnPattern } from './types';
 
 export const SCENE_W = 360;
 export const SCENE_H = 720;
@@ -18,27 +21,12 @@ const FOX_SCALE = 0.72; // was 0.6: Capi is the hero and should outweigh the ite
 const LEAN_MAX = 14; // degrees, toward the direction of vertical travel
 const POOL_MAX = 12; // pooled nodes kept per kind:id
 
-export interface Entity {
-  kind: 'item' | 'obstacle';
-  id: ItemId | ObstacleId;
+/** An SVG entity: the shared contract plus scene position and its pooled node. */
+interface SvgEntity extends Entity {
   x: number;
   y: number;
   el: SVGGElement;
-  done: boolean;
-  /** Golden signature item: ×3 points, counts 2 toward the coupon. */
-  golden: boolean;
 }
-
-export interface RunnerHandlers {
-  onCollect: (entity: Entity, screen: { x: number; y: number }) => void;
-  onHit: (entity: Entity, screen: { x: number; y: number }) => void;
-  /** An obstacle passed through during a dash. */
-  onDodge: (entity: Entity, screen: { x: number; y: number }) => void;
-  /** A dash started (for effects and the first-time hint). */
-  onDash: () => void;
-}
-
-export type SpawnPattern = 'single' | 'row' | 'arc' | 'zigzag';
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -48,7 +36,9 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
  * driven by update(dt) from the game loop, so it pauses with the game.
  * The runner owns no timers of its own; difficulty is a function of elapsed time.
  */
-export class Runner {
+export class Runner implements RunnerApi {
+  readonly mode = '2d' as const;
+  readonly moveWords = 'up and down';
   readonly el: SVGSVGElement;
   private layers: { g: SVGGElement; def: ParallaxLayer; offset: number }[] = [];
   private entityLayer: SVGGElement;
@@ -59,7 +49,7 @@ export class Runner {
   /** Set by the game from prefers-reduced-motion: no lane lean. */
   reducedMotion = false;
   private hintG: SVGGElement;
-  private entities: Entity[] = [];
+  private entities: SvgEntity[] = [];
   private foxY: number;
   private targetY: number;
   private elapsed = 0;
@@ -146,6 +136,7 @@ export class Runner {
     // pointercancel / pointerleave: nothing is held, the fox simply keeps its current target.
   }
 
+  get stats() { return { gl: this.water?.alive ?? false, draws: 0 }; }
   get progressRamp() { return Math.min(1, this.elapsed / this.dest.level.rampMs); }
   get speed() { return lerp(this.dest.level.speedStart, this.dest.level.speedEnd, this.progressRamp); }
 
@@ -294,10 +285,9 @@ export class Runner {
       this.addEntity('obstacle', def.id, SPAWN_X, y, def.scale ?? 1, OBSTACLE_ART[def.id]);
       return;
     }
-    const def = this.pickWeighted(items);
+    const def = pickWeighted(items, this.random);
     // Items arrive in readable patterns: single, a row, an arc or a zigzag; every y stays in the band.
-    const r = this.random();
-    const pattern: SpawnPattern = r < 0.5 ? 'single' : r < 0.7 ? 'row' : r < 0.85 ? 'arc' : 'zigzag';
+    const pattern = pickPattern(this.random());
     this.patternsSeen.add(pattern);
     const n = pattern === 'single' ? 1 : pattern === 'row' ? 3 : 4;
     const dir = this.random() < 0.5 ? 1 : -1;
@@ -309,13 +299,6 @@ export class Runner {
       const golden = isSignature && this.random() < FEEL.goldChance;
       this.addEntity('item', def.id, SPAWN_X + i * 64, this.clampY(y + dy), def.scale ?? 1, ITEM_ART[def.id](), golden);
     }
-  }
-
-  private pickWeighted<T extends { weight?: number }>(list: T[]): T {
-    const total = list.reduce((n, i) => n + (i.weight ?? 1), 0);
-    let r = this.random() * total;
-    for (const i of list) { r -= i.weight ?? 1; if (r <= 0) return i; }
-    return list[list.length - 1];
   }
 
   /** Entity <g> nodes are pooled per kind:id so a run allocates each item/obstacle markup only once or twice. */
@@ -337,7 +320,7 @@ export class Runner {
     this.entities.push({ kind, id, x, y, el, done: false, golden });
   }
 
-  private release(e: Entity) {
+  private release(e: SvgEntity) {
     e.el.classList.remove('collected', 'bumped', 'dodged', 'fade', 'entity--golden');
     e.el.remove();
     const key = `${e.kind}:${e.id}`;
@@ -347,7 +330,7 @@ export class Runner {
   }
 
   /** Debug/test accessor: upcoming live entities in scene units. */
-  liveEntities() { return this.entities.filter((e) => !e.done).map((e) => ({ kind: e.kind, id: e.id, x: e.x, y: e.y, golden: e.golden })); }
+  liveEntities(): LiveEntity[] { return this.entities.filter((e) => !e.done).map((e) => ({ kind: e.kind, id: e.id, x: e.x, y: e.y, golden: e.golden })); }
   get foxPosition() { return { x: FOX_X, y: this.foxY }; }
   /** Debug/test accessor: dash, dodge and spawn-pattern counters. */
   get feel() { return { dashes: this.dashes, dodges: this.dodges, dashing: this.dashLeft > 0, cooldown: this.dashCooldown > 0, patterns: [...this.patternsSeen] }; }

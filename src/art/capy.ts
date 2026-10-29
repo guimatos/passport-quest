@@ -43,6 +43,9 @@ const COSTUMES: Record<CostumeId, Costume> = {
   },
 };
 
+/** Costume palette, shared with the 3D model builder (`scene3d/models.ts`). */
+export const COSTUME_COLORS: Record<CostumeId, Pick<Costume, 'shirt' | 'shirtAccent' | 'shorts'>> = COSTUMES;
+
 function sideFace(mood: CapyMood) {
   const eye = mood === 'ouch'
     ? `<path d="M8 -36 l8 8 M16 -36 l-8 8" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`

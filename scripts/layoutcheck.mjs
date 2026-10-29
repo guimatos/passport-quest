@@ -1,7 +1,8 @@
 // Dev-only: landscape rotate prompt, desktop frame, and mid-game resize/orientation checks.
 import puppeteer from 'puppeteer-core';
+import { MODE, withMode } from './autopilot.mjs';
 const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const url = (process.argv[2] ?? 'http://localhost:4173/') + '?seed=5';
+const url = withMode((process.argv[2] ?? 'http://localhost:4173/') + '?seed=5');
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
 const page = await browser.newPage();
 const errors = [];
@@ -35,10 +36,18 @@ await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1800);
 await page.tap('.theme-btn[data-theme="food"]'); await sleep(500);
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 await sleep(300);
-const before = await page.evaluate(() => window.passportQuest.debug.fox.y);
-await page.mouse.move(200, 760); await sleep(600);
-const after = await page.evaluate(() => window.passportQuest.debug.fox.y);
-check(after > before + 30, `after resize the fox still follows the pointer (y ${before.toFixed(0)} -> ${after.toFixed(0)})`);
+if (MODE === '2d') {
+  const before = await page.evaluate(() => window.passportQuest.debug.fox.y);
+  await page.mouse.move(200, 760); await sleep(600);
+  const after = await page.evaluate(() => window.passportQuest.debug.fox.y);
+  check(after > before + 30, `after resize the fox still follows the pointer (y ${before.toFixed(0)} -> ${after.toFixed(0)})`);
+} else {
+  await page.mouse.move(40, 600); await sleep(600);
+  const before = await page.evaluate(() => window.passportQuest.debug.fox.x);
+  await page.mouse.move(350, 600); await sleep(600);
+  const after = await page.evaluate(() => window.passportQuest.debug.fox.x);
+  check(before < -0.8 && after > before + 1.5, `after resize Capi still follows the pointer (x ${before.toFixed(2)} -> ${after.toFixed(2)})`);
+}
 await page.setViewport({ width: 844, height: 390, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 await sleep(200);
 check(await rotateShown() && await paused(), 'rotating mid-game: prompt shown and game paused');
@@ -52,5 +61,5 @@ check(!(await paused()), 'rotating back resumes');
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight);
 check(!overflow, 'no document overflow after resizes');
 check(errors.length === 0, `no errors (${errors.length})`);
-console.log('\nLAYOUT CHECKS PASSED');
+console.log(`\nLAYOUT CHECKS PASSED (${MODE})`);
 await browser.close();

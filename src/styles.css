@@ -922,3 +922,15 @@ g:nth-child(3n) > .bulb { animation-delay: -1.1s; }
 .best-line b { color: #FFD966; }
 .final-best { font-size: 12px; opacity: 0.85; justify-content: center; }
 .final-best--new { color: #FFD966; font-weight: 700; opacity: 1; animation: combo-pop 0.5s cubic-bezier(.34,1.56,.64,1); }
+
+/* ---------- Stage 3: WebGL 3D runner ---------- */
+.scene--3d { position: relative; overflow: hidden; }
+.scene--3d canvas.gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* While the GL context is lost the canvas is blank; a sky gradient keeps the stage readable until it is restored. */
+.scene--3d canvas.gl.gl-lost { visibility: hidden; }
+.scene--brazil.scene--3d { background: linear-gradient(#3FB3EE 0%, #CDEFFB 55%, #F2DEA6 56%, #EBCF8F 100%); }
+.scene--portugal.scene--3d { background: linear-gradient(#7FA7E8 0%, #FFE1B8 55%, #B8B1A3 56%, #ADA698 100%); }
+.hint-hand--3d { position: absolute; left: 50%; top: 66%; width: 110px; height: 55px; transform: translate(-50%, -50%); pointer-events: none; overflow: visible; }
+.hint-hand--3d .hint-hand-inner { animation: hint-hand-x 1s ease-in-out infinite; }
+@keyframes hint-hand-x { 0%, 100% { transform: translateX(-16px); } 50% { transform: translateX(16px); } }
+#app.reduced-motion .hint-hand--3d .hint-hand-inner { animation: none !important; }

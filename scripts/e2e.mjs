@@ -2,9 +2,10 @@
 // Usage: node scripts/e2e.mjs [url] [width] [height]
 // Steers the fox with an in-page autopilot that dispatches real PointerEvents.
 import puppeteer from 'puppeteer-core';
+import { MODE, withMode, installAutopilot } from './autopilot.mjs';
 
 const base = process.argv[2] ?? 'http://localhost:5173/';
-const url = base + (base.includes('?') ? '&' : '?') + 'seed=7';
+const url = withMode(base + (base.includes('?') ? '&' : '?') + 'seed=7');
 const W = Number(process.argv[3] ?? 320), H = Number(process.argv[4] ?? 568);
 const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const shots = process.env.SHOTS ?? '';
@@ -33,36 +34,7 @@ const FEEL_DASH_SETTLE = 500; // > dashMs (350); polled, since headless frame pa
 /** Polls fn every 50 ms; resolves the elapsed ms when it returns true, or null after maxMs. */
 const until = async (fn, maxMs) => { const t = Date.now(); while (Date.now() - t < maxMs) { if (await fn()) return Date.now() - t; await sleep(50); } return null; };
 
-// In-page autopilot: steer toward the nearest item (or obstacle when target='obstacle').
-// With dashThrough, it presses Space when an obstacle is about to hit (exercises the dash/dodge path).
-await page.evaluate(() => {
-  window.__autopilot = (ms, target = 'item', dashThrough = false) => new Promise((res) => {
-    const g = window.passportQuest, stage = document.getElementById('stage');
-    const end = performance.now() + ms;
-    const step = () => {
-      const d = g.debug;
-      if (d.state !== 'playing' || performance.now() > end) return res();
-      const ahead = d.entities.filter((e) => e.x > d.fox.x - 10).sort((a, b) => a.x - b.x);
-      const wanted = ahead.filter((e) => e.kind === target);
-      let ty = wanted.length ? wanted[0].y : null;
-      if (ty !== null && target === 'item') {
-        for (const o of ahead.filter((e) => e.kind === 'obstacle' && e.x < wanted[0].x + 40)) {
-          if (Math.abs(o.y - ty) < 55) ty = o.y + (ty >= o.y ? 75 : -75);
-        }
-      }
-      if (ty !== null) {
-        const p = d.toScreen(0, ty);
-        stage.dispatchEvent(new PointerEvent('pointermove', { clientX: 100, clientY: p.y, isPrimary: true, pointerType: 'mouse', bubbles: true }));
-      }
-      if (dashThrough) {
-        const near = ahead.find((e) => e.kind === 'obstacle' && e.x - d.fox.x < 90 && Math.abs(e.y - d.fox.y) < 40);
-        if (near && !d.feel.dashing && !d.feel.cooldown) window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-      }
-      requestAnimationFrame(step);
-    };
-    step();
-  });
-});
+await installAutopilot(page);
 const autopilot = (ms, target, dash) => page.evaluate((ms, t, dsh) => window.__autopilot(ms, t, dsh), ms, target, dash);
 
 await shot('01-start');
@@ -90,29 +62,51 @@ check(!(await hintVisible()) || (await dbg()).progress > 0, 'ghost hand hides af
 check((await dbg()).chosen.brazil === 'food', 'chosen theme recorded (food)');
 check((await page.$$('.chip')).length === 3, 'HUD shows the 3 items of the chosen theme');
 check(await page.$eval('.hud-toast', (e) => getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)'), 'toast has a solid backing');
-check((await page.$$('.runner-lean')).length === 1 && (await page.$$('.backdrop rect[fill$="-shade)"]')).length === 1, 'lane-lean group and band shade present');
-check(await page.evaluate(() => window.passportQuest.debug.waterAlive), 'WebGL water active');
-check(await page.$eval('.water-rect', (e) => getComputedStyle(e).display === 'none'), 'SVG water rect hidden under the shader');
+const mode = await page.evaluate(() => window.passportQuest.debug.mode);
+check(mode === MODE, `runner mode is ${MODE}`);
+if (MODE === '2d') {
+  check((await page.$$('.runner-lean')).length === 1 && (await page.$$('.backdrop rect[fill$="-shade)"]')).length === 1, 'lane-lean group and band shade present');
+  check(await page.evaluate(() => window.passportQuest.debug.waterAlive), 'WebGL water active');
+  check(await page.$eval('.water-rect', (e) => getComputedStyle(e).display === 'none'), 'SVG water rect hidden under the shader');
+} else {
+  check((await page.$('.scene--3d canvas.gl')) !== null && (await page.evaluate(() => window.passportQuest.debug.gl)), '3D runner: WebGL canvas present and context alive');
+  check((await page.evaluate(() => window.passportQuest.debug.draws)) > 10, `3D runner draws the scene (${await page.evaluate(() => window.passportQuest.debug.draws)} draw calls last frame)`);
+  check(await page.$eval('.hud-bubble', (e) => e.textContent.includes('left and right') || e.textContent.includes('coupon')), 'fox hint speaks of left and right in 3D');
+}
 await shot('02-brazil');
 
-// Real pointer: fox follows the mouse Y
-const before = (await dbg()).fox.y;
-await page.mouse.move(150, H * 0.9);
-await sleep(600);
-const after = (await dbg()).fox.y;
-check(after > before + 40, `fox follows real mouse move (y ${before.toFixed(0)} -> ${after.toFixed(0)})`);
-
-// Keyboard: ArrowUp held moves Capi up; Space dashes (once, then cooldown)
-const k0 = (await dbg()).fox.y;
-await page.keyboard.down('ArrowUp'); await sleep(500); await page.keyboard.up('ArrowUp');
-const k1 = (await dbg()).fox.y;
-check(k1 < k0 - 40, `ArrowUp moves Capi up (y ${k0.toFixed(0)} -> ${k1.toFixed(0)})`);
+if (MODE === '2d') {
+  // Real pointer: fox follows the mouse Y
+  const before = (await dbg()).fox.y;
+  await page.mouse.move(150, H * 0.9);
+  await sleep(600);
+  const after = (await dbg()).fox.y;
+  check(after > before + 40, `fox follows real mouse move (y ${before.toFixed(0)} -> ${after.toFixed(0)})`);
+  // Keyboard: ArrowUp held moves Capi up
+  const k0 = (await dbg()).fox.y;
+  await page.keyboard.down('ArrowUp'); await sleep(500); await page.keyboard.up('ArrowUp');
+  const k1 = (await dbg()).fox.y;
+  check(k1 < k0 - 40, `ArrowUp moves Capi up (y ${k0.toFixed(0)} -> ${k1.toFixed(0)})`);
+} else {
+  // Real pointer: Capi follows the mouse X (lateral world units)
+  await page.mouse.move(W * 0.15, H * 0.7); await sleep(600);
+  const before = (await dbg()).fox.x;
+  await page.mouse.move(W * 0.85, H * 0.7); await sleep(600);
+  const after = (await dbg()).fox.x;
+  check(before < -0.8 && after > before + 1.5, `Capi follows real mouse move (x ${before.toFixed(2)} -> ${after.toFixed(2)})`);
+  // Keyboard: ArrowLeft held moves Capi left
+  const k0 = (await dbg()).fox.x;
+  await page.keyboard.down('ArrowLeft'); await sleep(500); await page.keyboard.up('ArrowLeft');
+  const k1 = (await dbg()).fox.x;
+  check(k1 < k0 - 0.8, `ArrowLeft moves Capi left (x ${k0.toFixed(2)} -> ${k1.toFixed(2)})`);
+}
+// Space dashes (once, then cooldown)
 await page.keyboard.press('Space'); await page.keyboard.press('Space');
 const feel0 = await feel();
 check(feel0.dashes === 1 && feel0.dashing, 'Space dashes once; second press inside the cooldown is ignored');
-check(await page.$eval('.runner-root', (e) => e.classList.contains('dashing')), 'dashing class while dashing');
+if (MODE === '2d') check(await page.$eval('.runner-root', (e) => e.classList.contains('dashing')), 'dashing class while dashing');
 const dashEndedAt = await until(async () => !(await feel()).dashing, FEEL_DASH_SETTLE * 3);
-check(dashEndedAt !== null && !(await page.$eval('.runner-root', (e) => e.classList.contains('dashing'))), `dash ends after its window (${dashEndedAt} ms wall time, class removed)`);
+check(dashEndedAt !== null && (MODE === '3d' || !(await page.$eval('.runner-root', (e) => e.classList.contains('dashing')))), `dash ends after its window (${dashEndedAt} ms wall time)`);
 
 // Hint appears after ~4s without a collection (fox parked at the bottom, items may still hit it, so allow either)
 await sleep(4300);
@@ -238,7 +232,7 @@ for (let i = 0; i < 12; i++) {
   check(await page.$eval('#fx', (e) => e.childElementCount) === 0, `iteration ${i}: fx cleared`);
   check(await page.$eval('#scene-root', (e) => e.childElementCount) === 0, `iteration ${i}: scene cleared`);
   check(await page.evaluate(() => window.passportQuest.debug.particles === 0 && getComputedStyle(document.getElementById('stage')).transform === 'none' && document.getElementById('wipe').className === ''), `iteration ${i}: particles cleared, shake and wipe reset`);
-  check(await page.evaluate(() => !window.passportQuest.debug.waterAlive && document.getElementById('water') === null), `iteration ${i}: water torn down (no canvas, no context)`);
+  check(await page.evaluate(() => !window.passportQuest.debug.waterAlive && !window.passportQuest.debug.gl && document.getElementById('water') === null && document.querySelector('.scene--3d') === null), `iteration ${i}: GL torn down (no canvas, no context)`);
   check((await feel()) === null, `iteration ${i}: runner gone (no dash/keyboard state)`);
   check(await page.evaluate(() => { const d = window.passportQuest.debug; return d.combo === 0 && d.hitStop === 0 && d.dodges === 0; }), `iteration ${i}: combo, hit-stop and dodges reset`);
 }
@@ -283,9 +277,10 @@ if (errors.length) console.log(errors);
 await page.goto(url + '&nowebgl=1', { waitUntil: 'networkidle0' });
 await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="food"]'); await sleep(400);
 check((await state()) === 'playing', 'fallback run enters playing');
+check((await page.evaluate(() => window.passportQuest.debug.mode)) === '2d' && (await page.$('.scene--3d')) === null, 'fallback run uses the SVG runner');
 check(!(await page.evaluate(() => window.passportQuest.debug.waterAlive)) && (await page.$('#water')) === null, 'no WebGL water with ?nowebgl=1');
 check(await page.$eval('.water-rect', (e) => getComputedStyle(e).display !== 'none'), 'SVG water rect visible in fallback');
 check(errors.length === 0, `no errors in the fallback run (${errors.length})`);
 
-console.log(`\nALL CHECKS PASSED at ${W}x${H}`);
+console.log(`\nALL CHECKS PASSED at ${W}x${H} (${MODE})`);
 await browser.close();

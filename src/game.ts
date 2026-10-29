@@ -5,7 +5,9 @@ import { Clock, easeInOutCubic, easeOutBack } from './lib/clock';
 import { Loop } from './lib/loop';
 import { $ } from './lib/dom';
 import { createRandom, seedFromUrl } from './lib/random';
-import { Runner, type Entity } from './scene/runner';
+import { Runner } from './scene/runner';
+import { Runner3D } from './scene3d/runner3d';
+import type { Entity, RunnerApi } from './scene/types';
 import { Fx } from './fx/fx';
 import { Hud } from './ui/hud';
 import { renderStart, renderRedeem, renderJournal, renderIntro, markIntroDestination, renderThemeCard, renderFinal, showCtaConfirm, clearScreen, type Counts, type Chosen } from './ui/screens';
@@ -61,7 +63,7 @@ export class Game {
   private fx: Fx;
   private hud: Hud;
   private music = new Music();
-  private runner: Runner | null = null;
+  private runner: RunnerApi | null = null;
   private random = createRandom(1);
   private hintTimer: number | undefined;
   private bubbleTimer: number | undefined;
@@ -281,12 +283,17 @@ export class Game {
     const dest = this.destination;
     const theme = this.theme;
     this.app.style.setProperty('--scene-bg', SCENE_ART[dest.id].variants[theme.id]?.bg ?? SCENE_ART[dest.id].bg);
-    this.runner = new Runner(dest, theme, {
-      onCollect: (e, screen) => this.collect(e, screen),
-      onHit: (e, screen) => this.hit(e, screen),
-      onDodge: (e, screen) => this.dodge(e, screen),
+    const handlers = {
+      onCollect: (e: Entity, screen: { x: number; y: number }) => this.collect(e, screen),
+      onHit: (e: Entity, screen: { x: number; y: number }) => this.hit(e, screen),
+      onDodge: (e: Entity, screen: { x: number; y: number }) => this.dodge(e, screen),
       onDash: () => this.onDash(),
-    }, this.random, this.ac.signal, this.stage);
+    };
+    // 3D (WebGL) by default; the SVG runner when WebGL is unavailable, or with ?mode=2d / ?nowebgl=1.
+    const params = new URLSearchParams(location.search);
+    const want3d = !params.has('nowebgl') && params.get('mode') !== '2d';
+    this.runner = (want3d && Runner3D.create(dest, theme, handlers, this.random, this.ac.signal, this.stage))
+      || new Runner(dest, theme, handlers, this.random, this.ac.signal, this.stage);
     this.sceneRoot.appendChild(this.runner.el);
     if (this.runner.water) this.runner.water.static = this.reducedMotion();
     this.runner.reducedMotion = this.reducedMotion();
@@ -299,7 +306,7 @@ export class Game {
     this.hud.setCombo(1);
     this.music.play(dest.id === 'brazil' ? 'rio' : 'porto');
     const couponItem = theme.items.find((i) => i.id === theme.coupon.itemId)!;
-    this.say(this.completedDests.length === 0 ? 'Move up and down. Tap to dash!' : `${dest.name}! Faster this time.`, 2400);
+    this.say(this.completedDests.length === 0 ? `Move ${this.runner.moveWords}. Tap to dash!` : `${dest.name}! Faster this time.`, 2400);
     this.clock.after(2600, () => this.say(`Catch ${theme.coupon.need} ${couponItem.label.toLowerCase()}s for a coupon!`, 2600));
     this.armHint();
     // Ghost hand: show the move hint right away for a moment; the idle hint (armHint) takes over after that.
@@ -501,7 +508,7 @@ export class Game {
     this.hintTimer = this.clock.after(HINT_DELAY, () => {
       if (this.state !== 'playing' || !this.runner) return;
       this.runner.setHint(true);
-      this.say('Move up and down to catch items!', 2000, 'think');
+      this.say(`Move ${this.runner.moveWords} to catch items!`, 2000, 'think');
     });
   }
 
@@ -529,6 +536,9 @@ export class Game {
       pool: this.runner?.poolSize() ?? 0,
       particles: this.fx.activeParticles,
       waterAlive: this.runner?.water?.alive ?? false,
+      mode: this.runner?.mode ?? null,
+      gl: this.runner?.stats.gl ?? false,
+      draws: this.runner?.stats.draws ?? 0,
       wiping: this.wiping,
       wipes: this.wipeCount,
       reducedMotion: this.reducedMotion(),
