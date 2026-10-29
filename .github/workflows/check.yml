@@ -14,6 +14,10 @@ jobs:
           cache: npm
       - uses: browser-actions/setup-chrome@v1
         id: chrome
+      # Ubuntu 24.04 runners restrict unprivileged user namespaces (AppArmor), which
+      # kills Chrome's sandbox at startup ("No usable sandbox!"). Lift the restriction
+      # instead of launching with --no-sandbox so the scripts stay unchanged.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: npm ci
       - run: npm run check
         env:
