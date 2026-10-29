@@ -158,7 +158,7 @@ function skyMesh(top: RGB, horizon: RGB, night: boolean, sun: { x: number; y: nu
   if (night) {
     s.disc(sun.r * 0.8, 12, mix(top, hex('#4B2A8C'), 0.5), { p: [sun.x + sun.r * 0.45, sun.y + sun.r * 0.3, -148.5], r: [X, 0, 0] }, 0);
     const r = rng(7);
-    for (let i = 0; i < 80; i++) s.disc(0.5 + r() * 0.5, 4, CREAM, { p: [-300 + r() * 600, 14 + r() * 110, -149], r: [X, 0, 0] }, 0);
+    for (let i = 0; i < 140; i++) s.disc(0.5 + r() * 0.5, 4, CREAM, { p: [-300 + r() * 600, 14 + r() * 110, -149], r: [X, 0, 0] }, 0);
   } else {
     s.disc(sun.r * 1.35, 14, mix(horizon, sun.col, 0.35), { p: [sun.x, sun.y, -149.5], r: [X, 0, 0] }, 0);
   }
@@ -186,7 +186,7 @@ function rio(theme: ThemeId, night: boolean): World {
   const art = SCENE_ART.brazil, w = { ...WATER.brazil, ...art.variants[theme]?.water };
   const sand = hex('#F2DEA6'), sandDark = hex('#E4C98B'), wet = hex('#D9C58E');
   const skyTop = night ? hex('#1A1040') : hex('#3FB3EE'), horizon = night ? hex('#8A4FA8') : hex('#CDEFFB');
-  const sky = skyMesh(skyTop, horizon, night, night ? { x: 26, y: 50, col: hex('#FFF0C2'), r: 7 } : { x: 44, y: 60, col: hex('#FFE07A'), r: 10 });
+  const sky = skyMesh(skyTop, horizon, night, night ? { x: 14, y: 40, col: hex('#FFF0C2'), r: 6 } : { x: 44, y: 60, col: hex('#FFE07A'), r: 10 });
 
   const base = new MeshBuilder();
   base.plane(160, 200, sand, { p: [0, -0.05, -70] });

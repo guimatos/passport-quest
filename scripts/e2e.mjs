@@ -115,33 +115,32 @@ await shot('03-hint');
 const d0 = await dbg();
 check((await hintVisible()) || d0.progress > 0, 'hint shown after 4s without a collection');
 
-// Hit an obstacle: progress never goes negative, points unchanged; a hit resets the combo
-const p0 = await dbg();
+// Combo bookkeeping sampled every 100 ms for the whole Rio run: a hit resets the combo, catching grows it,
+// the badge shows the multiplier. Sampling spans every phase because in 3D the narrow band makes incidental
+// catches common and the level may complete during the obstacle phases.
 const comboState = () => page.evaluate(() => { const d = window.passportQuest.debug; return { combo: d.combo, mult: d.multiplier, hits: d.hits, badge: document.querySelector('.wallet-combo')?.classList.contains('show') ?? false, badgeText: document.querySelector('.wallet-combo')?.textContent ?? '' }; });
-const hunt = autopilot(6000, 'obstacle');
-let prevHits = (await comboState()).hits, sawReset = false;
-for (let i = 0; i < 55; i++) { await sleep(100); const s = await comboState(); if (s.hits > prevHits && s.combo <= 1) sawReset = true; prevHits = s.hits; } // <= 1: a catch may land in the same 100 ms sample
-await hunt;
+let prevHits = (await comboState()).hits, sawReset = false, maxCombo = 0, badgeSeen = false;
+const sampleWhile = async (run) => {
+  let running = true; run.then(() => { running = false; });
+  while (running) { await sleep(100); const s = await comboState(); if (s.hits > prevHits && s.combo <= 1) sawReset = true; prevHits = s.hits; maxCombo = Math.max(maxCombo, s.combo); if (s.mult > 1 && s.badge && s.badgeText === `x${s.mult}`) badgeSeen = true; } // combo <= 1: a catch may land in the same sample as the hit
+  await run;
+};
+const t0 = Date.now();
+// Hit obstacles: progress never goes negative, a hit resets the combo
+const p0 = await dbg();
+await sampleWhile(autopilot(6000, 'obstacle'));
 const p1 = await dbg();
 check(prevHits > 0 && sawReset, `a hit resets the combo (${prevHits} hits)`);
 check(p1.progress >= 0, `progress stays >= 0 after obstacle hunting (progress=${p1.progress}, was ${p0.progress})`);
 check(logs.filter((l) => l.startsWith('error')).length === 0, 'no errors during obstacle hits');
-await autopilot(5000, 'obstacle', true);
+await sampleWhile(autopilot(5000, 'obstacle', true));
 const feel1 = await feel();
 check(feel1.dodges > 0, `dash passes through obstacles (${feel1.dodges} dodged, ${feel1.dashes} dashes)`);
-
-// Combo grows while catching: sample during a 9 s item run, then play Brazil to completion
-const t0 = Date.now();
-let probing = true;
-const probe = autopilot(9000, 'item').then(() => { probing = false; }); // resolves early if the level completes
-let maxCombo = 0, badgeSeen = false, goldenSeen = false;
-while (probing) { await sleep(100); const s = await comboState(); maxCombo = Math.max(maxCombo, s.combo); if (s.mult > 1 && s.badge && s.badgeText === `x${s.mult}`) badgeSeen = true; if (!goldenSeen) goldenSeen = await page.evaluate(() => window.passportQuest.debug.entities.some((e) => e.golden)); }
-await probe;
+// Then catch items until Brazil completes
+await sampleWhile(autopilot(90000, 'item'));
 check(maxCombo >= 5, `combo grows while catching (max ${maxCombo})`);
 check(badgeSeen, 'combo badge shows the multiplier on the wallet');
-await autopilot(90000, 'item');
-goldenSeen = goldenSeen || (await feel()).goldens > 0; // counted by the runner, so no sampling gap
-check((await state()) !== 'playing', `Brazil completed via autopilot in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+check((await state()) !== 'playing', `Brazil completed via autopilot ${((Date.now() - t0) / 1000).toFixed(1)}s after the control checks`);
 const feel2 = await feel();
 check(feel2.patterns.length >= 3, `spawn patterns seen: ${feel2.patterns.join(', ')}`);
 await sleep(1500);
@@ -174,8 +173,6 @@ if (MODE === '3d') check((await page.evaluate(() => window.passportQuest.debug.w
 const t1 = Date.now();
 await autopilot(90000, 'item');
 check((await state()) !== 'playing', `Portugal completed via autopilot in ${((Date.now() - t1) / 1000).toFixed(1)}s`);
-goldenSeen = goldenSeen || (await feel()).goldens > 0;
-check(goldenSeen, 'a golden signature item spawned during the trip');
 await sleep(1500);
 await page.tap('.btn--continue'); await sleep(200);
 await page.tap('.btn--continue'); await sleep(500);
@@ -257,6 +254,7 @@ check((await page.evaluate(() => window.passportQuest.debug.best)) === (NO_STORA
 await autopilot(2500, 'item');
 check((await page.evaluate(() => window.passportQuest.debug.particles)) > 0, 'canvas particles active during play (dust/sparkles)');
 
+
 // Visibility pause: hint timer and world should not advance while hidden
 await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
 const hiddenA = await dbg();
@@ -271,12 +269,35 @@ check(!(await hintVisible()), 'no immediate hint on resume (no time jump)');
 await sleep(4200);
 check((await hintVisible()) || (await dbg()).progress > 0, 'hint fires ~4s after resume');
 
+if (MODE === '3d') {
+  // GL context loss: the canvas hides behind the CSS sky, the world keeps running, and a restore resumes drawing with no error
+  await page.evaluate(() => { const gl = document.querySelector('.scene--3d canvas.gl').getContext('webgl'); window.__lose = gl.getExtension('WEBGL_lose_context'); window.__lose.loseContext(); });
+  await sleep(300);
+  const lostA = await dbg();
+  check(!(await page.evaluate(() => window.passportQuest.debug.gl)) && (await page.$eval('.scene--3d canvas.gl', (e) => e.classList.contains('gl-lost'))), 'lost GL context: canvas hidden, context reported dead');
+  await sleep(400);
+  const lostB = await dbg();
+  check(lostB.state === 'playing' && (lostB.n !== lostA.n || lostB.entities.some((e, i) => lostA.entities[i] && e.y !== lostA.entities[i].y)), 'world keeps running while the context is lost');
+  await page.evaluate(() => window.__lose.restoreContext());
+  await sleep(400);
+  check(await page.evaluate(() => window.passportQuest.debug.gl && window.passportQuest.debug.draws > 10), 'restored GL context: rendering resumed');
+  check(errors.length === 0, `no errors across context loss and restore (${errors.length})`);
+}
+
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight);
 check(!overflow, 'no document overflow');
 const external = requests.filter((u) => !u.startsWith(new URL(url).origin));
 check(external.length === 0, `no external requests (${requests.length} local requests)`);
 check(errors.length === 0, `no console/page errors (${errors.length})`);
 if (errors.length) console.log(errors);
+
+// Golden signature item: with seed 13 the very first spawn is golden (the spawn RNG sequence is fixed per seed, verified by replay),
+// so this is deterministic in both runners: counted by the runner and visibly marked.
+await page.goto(withMode(base + (base.includes('?') ? '&' : '?') + 'seed=13'), { waitUntil: 'networkidle0' });
+await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="food"]'); await sleep(1800);
+check((await feel()).goldens >= 1 && (await dbg()).entities.some((e) => e.golden), `golden signature item spawned and is live (${(await feel()).goldens} golden so far)`);
+if (MODE === '2d') check((await page.$('.entity--golden')) !== null, 'golden item carries the glow class');
+check(errors.length === 0, `no errors in the golden run (${errors.length})`);
 
 // WebGL fallback: with ?nowebgl=1 the SVG gradient water shows and nothing errors
 await page.goto(url + '&nowebgl=1', { waitUntil: 'networkidle0' });

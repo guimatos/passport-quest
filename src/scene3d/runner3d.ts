@@ -67,6 +67,8 @@ export class Runner3D implements RunnerApi {
   private elapsedTotal = 0;
   private spawnIn = 900;
   private finished = false;
+  /** Milliseconds since finish(): remaining entities fade out over the first 600. */
+  private finishT = 0;
   private stunned = 0;
   private hintOn = false;
   private dashLeft = 0;
@@ -190,7 +192,7 @@ export class Runner3D implements RunnerApi {
   update(dt: number) {
     const sec = dt / 1000;
     this.elapsedTotal += dt;
-    if (!this.finished) this.elapsed += dt;
+    if (!this.finished) this.elapsed += dt; else this.finishT += dt;
     const speed = this.worldSpeed;
     this.scroll += speed * sec;
     while (this.scroll >= CHUNK_LEN) { this.scroll -= CHUNK_LEN; this.chunkCycle = (this.chunkCycle + 1) % this.world.chunks.length; }
@@ -324,9 +326,10 @@ export class Runner3D implements RunnerApi {
     }
 
     // Ground shadows (blended) then entities
+    const fade = this.finished ? Math.max(0, 1 - this.finishT / 600) : 1;
     for (const e of this.entities) {
-      if (e.done) continue;
-      r.draw(this.shadow, trs(this.m, e.x, 0.01, e.z, 0, 0, 0, e.scale * 0.9), { alpha: 0.22 });
+      if (e.done || fade <= 0) continue;
+      r.draw(this.shadow, trs(this.m, e.x, 0.01, e.z, 0, 0, 0, e.scale * 0.9), { alpha: 0.22 * fade });
     }
     r.draw(this.shadow, trs(this.m, this.capiX, 0.012, 0, 0, 0, 0, 1.1, 1, 1.2), { alpha: 0.25 });
     for (const e of this.entities) this.drawEntity(e, t);
@@ -337,9 +340,11 @@ export class Runner3D implements RunnerApi {
     const r = this.renderer;
     const golden = e.golden ? { tint: hex('#FFD966') as RGB, tintMix: 0.45 } : {};
     if (e.anim === 'live') {
+      const fade = this.finished ? Math.max(0, 1 - this.finishT / 600) : 1;
+      if (fade <= 0) return;
       const bob = e.kind === 'item' && !this.reducedMotion ? Math.sin(t * (e.golden ? 7 : 4.5) + e.phase) * 0.12 : 0;
       const spin = e.kind === 'item' ? t * (e.golden ? 3 : 1.6) + e.phase : 0;
-      r.draw(e.mesh, trs(this.m, e.x, e.h + bob, e.z, 0, spin, 0, e.scale), golden);
+      r.draw(e.mesh, trs(this.m, e.x, e.h + bob, e.z, 0, spin, 0, e.scale), fade < 1 ? { ...golden, alpha: fade } : golden);
       return;
     }
     const k = Math.min(1, e.t / (e.anim === 'pop' ? 280 : 500));
