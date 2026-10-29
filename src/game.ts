@@ -267,6 +267,8 @@ export class Game {
     this.runner = new Runner(dest, theme, {
       onCollect: (e, screen) => this.collect(e, screen),
       onHit: (e, screen) => this.hit(e, screen),
+      onDodge: (e, screen) => this.dodge(e, screen),
+      onDash: () => this.onDash(),
     }, this.random, this.ac.signal, this.stage);
     this.sceneRoot.appendChild(this.runner.el);
     if (this.runner.water) this.runner.water.static = this.reducedMotion();
@@ -328,6 +330,9 @@ export class Game {
     this.flash();
     this.say('Ouch! Watch out, Capi.', 1000, 'think');
   }
+
+  private dodge(_e: Entity, _screen: { x: number; y: number }) { /* Task 2: dodge rewards */ }
+  private onDash() { /* Task 2: dash effects */ }
 
   private addPoints(n: number) {
     this.points += n;
@@ -473,6 +478,7 @@ export class Game {
       wiping: this.wiping,
       wipes: this.wipeCount,
       reducedMotion: this.reducedMotion(),
+      feel: this.runner?.feel ?? null,
     };
   }
 }

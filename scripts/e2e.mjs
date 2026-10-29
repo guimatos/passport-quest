@@ -25,10 +25,15 @@ const dbg = () => page.evaluate(() => { const d = window.passportQuest.debug; re
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const check = (cond, msg) => { if (!cond) throw new Error('CHECK FAILED: ' + msg); console.log('ok  ', msg); };
 const hintVisible = () => page.$eval('.hint-hand', (e) => e.getAttribute('visibility') === 'visible');
+const feel = () => page.evaluate(() => window.passportQuest.debug.feel);
+const FEEL_DASH_SETTLE = 500; // > dashMs (350); polled, since headless frame pacing varies
+/** Polls fn every 50 ms; resolves the elapsed ms when it returns true, or null after maxMs. */
+const until = async (fn, maxMs) => { const t = Date.now(); while (Date.now() - t < maxMs) { if (await fn()) return Date.now() - t; await sleep(50); } return null; };
 
 // In-page autopilot: steer toward the nearest item (or obstacle when target='obstacle').
+// With dashThrough, it presses Space when an obstacle is about to hit (exercises the dash/dodge path).
 await page.evaluate(() => {
-  window.__autopilot = (ms, target = 'item') => new Promise((res) => {
+  window.__autopilot = (ms, target = 'item', dashThrough = false) => new Promise((res) => {
     const g = window.passportQuest, stage = document.getElementById('stage');
     const end = performance.now() + ms;
     const step = () => {
@@ -46,12 +51,16 @@ await page.evaluate(() => {
         const p = d.toScreen(0, ty);
         stage.dispatchEvent(new PointerEvent('pointermove', { clientX: 100, clientY: p.y, isPrimary: true, pointerType: 'mouse', bubbles: true }));
       }
+      if (dashThrough) {
+        const near = ahead.find((e) => e.kind === 'obstacle' && e.x - d.fox.x < 90 && Math.abs(e.y - d.fox.y) < 40);
+        if (near && !d.feel.dashing && !d.feel.cooldown) window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      }
       requestAnimationFrame(step);
     };
     step();
   });
 });
-const autopilot = (ms, target) => page.evaluate((ms, t) => window.__autopilot(ms, t), ms, target);
+const autopilot = (ms, target, dash) => page.evaluate((ms, t, dsh) => window.__autopilot(ms, t, dsh), ms, target, dash);
 
 await shot('01-start');
 check((await state()) === 'start', 'starts on start screen');
@@ -84,6 +93,18 @@ await sleep(600);
 const after = (await dbg()).fox.y;
 check(after > before + 40, `fox follows real mouse move (y ${before.toFixed(0)} -> ${after.toFixed(0)})`);
 
+// Keyboard: ArrowUp held moves Capi up; Space dashes (once, then cooldown)
+const k0 = (await dbg()).fox.y;
+await page.keyboard.down('ArrowUp'); await sleep(500); await page.keyboard.up('ArrowUp');
+const k1 = (await dbg()).fox.y;
+check(k1 < k0 - 40, `ArrowUp moves Capi up (y ${k0.toFixed(0)} -> ${k1.toFixed(0)})`);
+await page.keyboard.press('Space'); await page.keyboard.press('Space');
+const feel0 = await feel();
+check(feel0.dashes === 1 && feel0.dashing, 'Space dashes once; second press inside the cooldown is ignored');
+check(await page.$eval('.runner-root', (e) => e.classList.contains('dashing')), 'dashing class while dashing');
+const dashEndedAt = await until(async () => !(await feel()).dashing, FEEL_DASH_SETTLE * 3);
+check(dashEndedAt !== null && !(await page.$eval('.runner-root', (e) => e.classList.contains('dashing'))), `dash ends after its window (${dashEndedAt} ms wall time, class removed)`);
+
 // Hint appears after ~4s without a collection (fox parked at the bottom, items may still hit it, so allow either)
 await sleep(4300);
 await shot('03-hint');
@@ -96,11 +117,16 @@ await autopilot(6000, 'obstacle');
 const p1 = await dbg();
 check(p1.progress >= 0, `progress stays >= 0 after obstacle hunting (progress=${p1.progress}, was ${p0.progress})`);
 check(logs.filter((l) => l.startsWith('error')).length === 0, 'no errors during obstacle hits');
+await autopilot(5000, 'obstacle', true);
+const feel1 = await feel();
+check(feel1.dodges > 0, `dash passes through obstacles (${feel1.dodges} dodged, ${feel1.dashes} dashes)`);
 
 // Play Brazil to completion
 const t0 = Date.now();
 await autopilot(90000, 'item');
 check((await state()) !== 'playing', `Brazil completed via autopilot in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+const feel2 = await feel();
+check(feel2.patterns.length >= 3, `spawn patterns seen: ${feel2.patterns.join(', ')}`);
 await sleep(1500);
 await shot('04-redeem');
 const r1 = await dbg();
@@ -184,6 +210,7 @@ for (let i = 0; i < 12; i++) {
   check(await page.$eval('#scene-root', (e) => e.childElementCount) === 0, `iteration ${i}: scene cleared`);
   check(await page.evaluate(() => window.passportQuest.debug.particles === 0 && getComputedStyle(document.getElementById('stage')).transform === 'none' && document.getElementById('wipe').className === ''), `iteration ${i}: particles cleared, shake and wipe reset`);
   check(await page.evaluate(() => !window.passportQuest.debug.waterAlive && document.getElementById('water') === null), `iteration ${i}: water torn down (no canvas, no context)`);
+  check((await feel()) === null, `iteration ${i}: runner gone (no dash/keyboard state)`);
 }
 // prefers-reduced-motion: class applied on restart and followed live
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);

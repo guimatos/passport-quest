@@ -1,4 +1,4 @@
-import type { DestinationDef, ItemId, ObstacleId, ThemeDef } from '../data/destinations';
+import { FEEL, type DestinationDef, type ItemId, type ObstacleId, type ThemeDef } from '../data/destinations';
 import { ITEM_ART, OBSTACLE_ART } from '../art/items';
 import { SCENE_ART, WATER, sceneLayers, type ParallaxLayer } from '../art/scenes';
 import { Water } from './water';
@@ -23,12 +23,20 @@ export interface Entity {
   y: number;
   el: SVGGElement;
   done: boolean;
+  /** Golden signature item: ×3 points, counts 2 toward the coupon. */
+  golden: boolean;
 }
 
 export interface RunnerHandlers {
   onCollect: (entity: Entity, screen: { x: number; y: number }) => void;
   onHit: (entity: Entity, screen: { x: number; y: number }) => void;
+  /** An obstacle passed through during a dash. */
+  onDodge: (entity: Entity, screen: { x: number; y: number }) => void;
+  /** A dash started (for effects and the first-time hint). */
+  onDash: () => void;
 }
+
+export type SpawnPattern = 'single' | 'row' | 'arc' | 'zigzag';
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -54,6 +62,12 @@ export class Runner {
   private stunned = 0;
   private hintOn = false;
   private elapsedTotal = 0;
+  private dashLeft = 0;
+  private dashCooldown = 0;
+  private dashes = 0;
+  private dodges = 0;
+  private keys = new Set<string>();
+  private patternsSeen = new Set<SpawnPattern>();
   /** WebGL water under the SVG, or null when unavailable (SVG gradient shows instead). */
   water: Water | null = null;
 
@@ -97,14 +111,29 @@ export class Runner {
     this.hintG = this.el.querySelector('.hint-hand')!;
     this.placeFox();
 
-    // Pointer control: the fox follows the pointer's vertical position.
+    // Pointer control: Capi follows the pointer's vertical position.
     // Mouse hover works without pressing; touch drives it while touching.
+    // A quick tap (< 220 ms, < 12 px of travel) is a dash.
+    let downAt = 0, downY = 0;
     const follow = (ev: PointerEvent) => {
       if (!ev.isPrimary || this.finished) return;
       this.targetY = this.clampY(this.toSceneY(ev.clientY));
     };
     stage.addEventListener('pointermove', follow, { signal, passive: true });
-    stage.addEventListener('pointerdown', follow, { signal, passive: true });
+    stage.addEventListener('pointerdown', (ev) => { if (!ev.isPrimary) return; downAt = performance.now(); downY = ev.clientY; follow(ev); }, { signal, passive: true });
+    stage.addEventListener('pointerup', (ev) => {
+      if (!ev.isPrimary || !downAt) return;
+      if (performance.now() - downAt < 220 && Math.abs(ev.clientY - downY) < 12) this.dash();
+      downAt = 0;
+    }, { signal, passive: true });
+
+    // Keyboard: ArrowUp/ArrowDown move while held; Space or ArrowRight dashes.
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') { ev.preventDefault(); this.keys.add(ev.key); }
+      else if ((ev.key === ' ' || ev.key === 'ArrowRight') && !ev.repeat) { ev.preventDefault(); this.dash(); }
+    }, { signal });
+    window.addEventListener('keyup', (ev) => this.keys.delete(ev.key), { signal });
+    window.addEventListener('blur', () => this.keys.clear(), { signal });
     window.addEventListener('resize', () => { this.rect = null; this.water?.resize(); }, { signal }); // orientation changes fire resize too
     this.water = Water.create(stage, this.el, { ...WATER[dest.id], ...variant?.water });
     // pointercancel / pointerleave: nothing is held, the fox simply keeps its current target.
@@ -155,6 +184,18 @@ export class Runner {
     this.hintG.setAttribute('transform', `translate(${FOX_X + 70} ${this.foxY})`);
   }
 
+  /** Starts a dash unless finished or cooling down. Returns whether it started. */
+  dash() {
+    if (this.finished || this.dashCooldown > 0) return false;
+    this.dashLeft = FEEL.dashMs;
+    this.dashCooldown = FEEL.dashMs + FEEL.dashCooldownMs;
+    this.dashes++;
+    this.foxG.classList.add('dashing');
+    this.handlers.onDash();
+    return true;
+  }
+  get dashing() { return this.dashLeft > 0; }
+
   update(dt: number) {
     const sec = dt / 1000;
     this.elapsedTotal += dt;
@@ -167,6 +208,15 @@ export class Runner {
       l.offset = (l.offset + speed * l.def.speed * sec) % l.def.width;
       l.g.setAttribute('transform', `translate(${-l.offset} 0)`);
     }
+
+    // Keyboard hold
+    if (!this.finished) {
+      if (this.keys.has('ArrowUp')) this.targetY = this.clampY(this.targetY - FEEL.keySpeed * sec);
+      if (this.keys.has('ArrowDown')) this.targetY = this.clampY(this.targetY + FEEL.keySpeed * sec);
+    }
+    // Dash window and cooldown
+    if (this.dashLeft > 0) { this.dashLeft -= dt; if (this.dashLeft <= 0) this.foxG.classList.remove('dashing'); }
+    if (this.dashCooldown > 0) this.dashCooldown -= dt;
 
     // Fox follows target (exponential smoothing, frame-rate independent)
     const k = 1 - Math.exp(-FOLLOW_RATE * sec);
@@ -199,6 +249,10 @@ export class Runner {
           if (e.kind === 'item') {
             e.el.classList.add('collected');
             this.handlers.onCollect(e, screen);
+          } else if (this.dashLeft > 0) {
+            e.el.classList.add('dodged');
+            this.dodges++;
+            this.handlers.onDodge(e, screen);
           } else if (this.stunned <= 0) {
             e.el.classList.add('bumped');
             this.stunned = 700;
@@ -228,10 +282,19 @@ export class Runner {
       return;
     }
     const def = this.pickWeighted(items);
-    // Sometimes spawn a short chain of the same item for a satisfying streak.
-    const chain = this.random() < 0.25 ? 3 : 1;
-    for (let i = 0; i < chain; i++) {
-      this.addEntity('item', def.id, SPAWN_X + i * 64, y, def.scale ?? 1, ITEM_ART[def.id]());
+    // Items arrive in readable patterns: single, a row, an arc or a zigzag; every y stays in the band.
+    const r = this.random();
+    const pattern: SpawnPattern = r < 0.5 ? 'single' : r < 0.7 ? 'row' : r < 0.85 ? 'arc' : 'zigzag';
+    this.patternsSeen.add(pattern);
+    const n = pattern === 'single' ? 1 : pattern === 'row' ? 3 : 4;
+    const dir = this.random() < 0.5 ? 1 : -1;
+    const isSignature = def.id === this.theme.coupon.itemId;
+    for (let i = 0; i < n; i++) {
+      const dy = pattern === 'arc' ? -Math.sin((i / (n - 1)) * Math.PI) * 90 * dir
+        : pattern === 'zigzag' ? (i % 2 ? 70 : -70) * dir
+        : 0;
+      const golden = isSignature && this.random() < FEEL.goldChance;
+      this.addEntity('item', def.id, SPAWN_X + i * 64, this.clampY(y + dy), def.scale ?? 1, ITEM_ART[def.id](), golden);
     }
   }
 
@@ -246,7 +309,7 @@ export class Runner {
   private pool = new Map<string, SVGGElement[]>();
   poolSize() { let n = 0; for (const l of this.pool.values()) n += l.length; return n; }
 
-  private addEntity(kind: Entity['kind'], id: ItemId | ObstacleId, x: number, y: number, scale: number, markup: string) {
+  private addEntity(kind: Entity['kind'], id: ItemId | ObstacleId, x: number, y: number, scale: number, markup: string, golden = false) {
     const key = `${kind}:${id}`;
     let el = this.pool.get(key)?.pop();
     if (!el) {
@@ -254,13 +317,14 @@ export class Runner {
       el.setAttribute('class', `entity entity--${kind} entity--${id}`);
       el.innerHTML = `<g class="entity-anim"><g class="entity-art" transform="scale(${scale})">${markup}</g></g>`;
     }
+    el.classList.toggle('entity--golden', golden);
     el.setAttribute('transform', `translate(${x} ${y}) scale(${this.depthScale(y)})`);
     this.entityLayer.appendChild(el);
-    this.entities.push({ kind, id, x, y, el, done: false });
+    this.entities.push({ kind, id, x, y, el, done: false, golden });
   }
 
   private release(e: Entity) {
-    e.el.classList.remove('collected', 'bumped', 'fade');
+    e.el.classList.remove('collected', 'bumped', 'dodged', 'fade', 'entity--golden');
     e.el.remove();
     const key = `${e.kind}:${e.id}`;
     const list = this.pool.get(key) ?? [];
@@ -269,8 +333,10 @@ export class Runner {
   }
 
   /** Debug/test accessor: upcoming live entities in scene units. */
-  liveEntities() { return this.entities.filter((e) => !e.done).map((e) => ({ kind: e.kind, id: e.id, x: e.x, y: e.y })); }
+  liveEntities() { return this.entities.filter((e) => !e.done).map((e) => ({ kind: e.kind, id: e.id, x: e.x, y: e.y, golden: e.golden })); }
   get foxPosition() { return { x: FOX_X, y: this.foxY }; }
+  /** Debug/test accessor: dash, dodge and spawn-pattern counters. */
+  get feel() { return { dashes: this.dashes, dodges: this.dodges, dashing: this.dashLeft > 0, cooldown: this.dashCooldown > 0, patterns: [...this.patternsSeen] }; }
 
   setMood(mood: CapyMood) {
     this.foxInner.innerHTML = capyGroup(mood, this.theme.costume);
@@ -292,5 +358,5 @@ export class Runner {
     this.entities.forEach((e) => e.el.classList.add('fade'));
   }
 
-  destroy() { this.water?.destroy(); this.water = null; this.el.remove(); this.entities = []; this.pool.clear(); }
+  destroy() { this.water?.destroy(); this.water = null; this.keys.clear(); this.foxG.classList.remove('dashing'); this.el.remove(); this.entities = []; this.pool.clear(); }
 }

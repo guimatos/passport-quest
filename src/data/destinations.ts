@@ -217,3 +217,25 @@ export const DESTINATIONS: DestinationDef[] = [
 export const themeOf = (dest: DestinationDef, id: ThemeId) => dest.themes.find((t) => t.id === id)!;
 export const ALL_ITEMS: ItemDef[] = DESTINATIONS.flatMap((d) => d.themes.flatMap((t) => t.items));
 export const itemDef = (id: ItemId) => ALL_ITEMS.find((i) => i.id === id)!;
+
+/**
+ * Gameplay-feel tuning (Stage 2b). Kept apart from `level` so difficulty
+ * values stay untouched; every number here is recorded in the dev note.
+ */
+export const FEEL = {
+  /** Chance that a spawned signature item is golden (×3 points, counts 2 toward the coupon). */
+  goldChance: 0.12,
+  /** Dash: obstacle immunity window and the cooldown that follows it (ms). */
+  dashMs: 350,
+  dashCooldownMs: 1100,
+  /** Points per item are multiplied by 1 + floor(combo / comboStep), capped at comboMax. */
+  comboStep: 5,
+  comboMax: 4,
+  /** Frame freeze on a hit and on a golden/coupon catch (ms). */
+  hitStopHitMs: 45,
+  hitStopRewardMs: 90,
+  /** Demo points for dashing through an obstacle. */
+  dodgePoints: 5,
+  /** Keyboard vertical speed (scene units per second). */
+  keySpeed: 420,
+} as const;
