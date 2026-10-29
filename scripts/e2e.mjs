@@ -36,6 +36,10 @@ const feel = () => page.evaluate(() => window.passportQuest.debug.feel);
 const FEEL_DASH_SETTLE = 500; // > dashMs (350); polled, since headless frame pacing varies
 /** Polls fn every 50 ms; resolves the elapsed ms when it returns true, or null after maxMs. */
 const until = async (fn, maxMs) => { const t = Date.now(); while (Date.now() - t < maxMs) { if (await fn()) return Date.now() - t; await sleep(50); } return null; };
+/** The intro card slides in on the game clock (500 ms); on a slow renderer it is still moving when a fixed
+ *  sleep ends and a tap computed on the moving card lands beside the button. Wait for it to settle first. */
+const cardSettled = () => until(() => page.$eval('.intro-card', (e) => e.classList.contains('show') && e.style.opacity === '1' && e.style.transform === 'translateY(0px)'), 4000);
+const tapTheme = async (id) => { check((await cardSettled()) !== null, `intro card settled before choosing ${id}`); await page.tap(`.theme-btn[data-theme="${id}"]`); };
 
 await installAutopilot(page);
 const autopilot = (ms, target, dash) => page.evaluate((ms, t, dsh) => window.__autopilot(ms, t, dsh), ms, target, dash);
@@ -55,7 +59,7 @@ check(await page.$eval('.intro-card', (e) => e.classList.contains('show')), 'int
 check(await page.$eval('.dest-list', (e) => e.offsetParent === null), 'city buttons hidden once a city is picked');
 check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Rio')), 'first pick (Rio) wins over the second tap');
 check((await page.$$('.theme-btn')).length === 3, 'intro offers 3 themes');
-await page.tap('.theme-btn[data-theme="food"]');
+await tapTheme('food');
 await page.tap('.theme-btn[data-theme="party"]').catch(() => {});
 await sleep(500);
 check((await state()) === 'playing', 'choosing a theme enters playing (second tap ignored)');
@@ -167,7 +171,7 @@ check((await state()) === 'intro', 'journal continue returns to the map');
 await sleep(3400); await shot('05-intro-porto');
 check(await page.$$eval('.map-marker--done', (els) => els.length) === 1, 'map shows Rio as done');
 check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Porto')), 'remaining destination auto-selected (Porto)');
-await page.tap('.theme-btn[data-theme="party"]'); await sleep(500);
+await tapTheme('party'); await sleep(500);
 check((await state()) === 'playing' && (await dbg()).chosen.portugal === 'party', 'Porto theme chosen (party)');
 check(await page.$eval('.hud-place-name', (e) => e.textContent) === 'Porto', 'HUD shows Porto');
 await shot('06-porto');
@@ -249,7 +253,7 @@ await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-pr
 await sleep(50);
 check(!(await page.$eval('#app', (e) => e.classList.contains('reduced-motion'))), 'reduced-motion class removed when the preference changes');
 
-await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="party"]'); await sleep(400);
+await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await tapTheme('party'); await sleep(400);
 check((await state()) === 'playing' && (await dbg()).points === 0, 'points reset after restarts');
 check(await page.$eval('.btn--mute', (e) => e.getAttribute('aria-pressed') === 'false'), 'mute state (unmuted) restored from storage after restarts');
 check((await page.evaluate(() => window.passportQuest.debug.best)) === (NO_STORAGE ? 0 : finalPts), `best score ${NO_STORAGE ? 'is 0 without storage' : 'survives restarts'}`);
@@ -296,14 +300,14 @@ if (errors.length) console.log(errors);
 // Golden signature item: with seed 13 the very first spawn is golden (the spawn RNG sequence is fixed per seed, verified by replay),
 // so this is deterministic in both runners: counted by the runner and visibly marked.
 await page.goto(withMode(base + (base.includes('?') ? '&' : '?') + 'seed=13'), { waitUntil: 'networkidle0' });
-await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="food"]'); await sleep(1800);
+await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await tapTheme('food'); await sleep(1800);
 check((await feel()).goldens >= 1 && (await dbg()).entities.some((e) => e.golden), `golden signature item spawned and is live (${(await feel()).goldens} golden so far)`);
 if (MODE === '2d') check((await page.$('.entity--golden')) !== null, 'golden item carries the glow class');
 check(errors.length === 0, `no errors in the golden run (${errors.length})`);
 
 // WebGL fallback: with ?nowebgl=1 the SVG gradient water shows and nothing errors
 await page.goto(url + '&nowebgl=1', { waitUntil: 'networkidle0' });
-await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="food"]'); await sleep(400);
+await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await tapTheme('food'); await sleep(400);
 check((await state()) === 'playing', 'fallback run enters playing');
 check((await page.evaluate(() => window.passportQuest.debug.mode)) === '2d' && (await page.$('.scene--3d')) === null, 'fallback run uses the SVG runner');
 check(!(await page.evaluate(() => window.passportQuest.debug.waterAlive)) && (await page.$('#water')) === null, 'no WebGL water with ?nowebgl=1');
