@@ -41,7 +41,7 @@ Code generation: none.
 - PR: optional; one PR per change targeting `main` on github.com/guimatos/passport-quest. Never push or tag unasked
 - Keeping current: n/a (single author)
 - QA / staging: none. "Ship to QA" means: `npm run build`, serve `dist/` statically and run `node scripts/e2e.mjs http://localhost:4173/ 320 568`
-- Release: `npm run package` → `release/passport-quest-stage1.zip` (the ZIP name and the `RUN.txt` label in `scripts/package.mjs` still say Stage 1; update them when packaging a later stage); tag the delivered commit (`stage1-v1`, `stage2-v1`, `stage3-v1`…). Never move an existing tag.
+- Release: `npm run package -- stageN` → `release/passport-quest-stageN.zip` (earlier stages' ZIPs are kept; `release/` is git-ignored); tag the delivered commit (`stage1-v1`, `stage2-v1`, `stage3-v1`…). Never move an existing tag.
 - Never:
   - Add a runtime network request, CDN, analytics or font link: the brief forbids external requests.
   - Add an npm runtime dependency without asking: the bundle is deliberately dependency-free.

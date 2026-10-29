@@ -54,17 +54,18 @@ Open the URL in a mobile viewport (Chrome DevTools device mode, 320×568 or
 ### Delivery ZIP
 
 ```bash
-npm run package    # build + release/passport-quest-stage1.zip
+npm run package -- stage3   # build + release/passport-quest-stage3.zip (default stage: stage3)
 ```
 
 The script puts the runnable build at the ZIP root (`index.html`, `assets/`),
 adds `RUN.txt`, this README and a `source/` folder with the readable
 TypeScript source, scripts and docs, then prints the byte size and root
 listing and fails if `index.html` is not at the root or the ZIP exceeds
-5,000,000 bytes. The exact byte size of the delivered ZIP is in the Stage 1 final report and in the `stage1-v1` tag message.
-The script still names the ZIP `passport-quest-stage1.zip` and labels
-`RUN.txt` as the Stage 1 build; change both in `scripts/package.mjs` before
-packaging the 3D version.
+5,000,000 bytes. The stage argument names the ZIP and the `RUN.txt` label;
+ZIPs of earlier stages in `release/` are left in place. The Stage 1 ZIP
+(`stage1-v1`) was 209,576 bytes; the Stage 3 ZIP built on 2026-10-29 is
+330,576 bytes and includes the plans, the model gallery page and the CI
+workflow under `source/`.
 
 ### Scripts
 
