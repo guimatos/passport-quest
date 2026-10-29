@@ -1,9 +1,13 @@
 # Passport Quest
 
-A mobile-first HTML5 playable for Scrambly (Simula take-home, Stage 1).
+A mobile-first HTML5 playable for Scrambly (Simula take-home, Stage 1; Stage 2
+polish and feel; Stage 3 adds a 3D version of the run).
 
 Capi the capybara runs through Rio de Janeiro and Porto, guided by the Scrambly
-fox. Before each city the player picks what to see (Eat & drink, Party or
+fox. Since Stage 3 the run is a low-poly 3D world drawn with hand-written WebGL
+(camera behind Capi, Copacabana and the Ribeira quay streaming toward the
+player); the original SVG parallax runner stays as the fallback when WebGL is
+unavailable or with `?mode=2d`. Before each city the player picks what to see (Eat & drink, Party or
 Culture); the run streams that theme's items, each catch adds **demo points**,
 and finishing a city **redeems** a passport stamp plus, if enough of the
 signature item was caught, a **demo coupon**. Discover → play & progress →
@@ -56,16 +60,20 @@ listing and fails if `index.html` is not at the root or the ZIP exceeds
 | `npm run preview` | Vite preview of `dist/` |
 | `npm run serve:dist` | Python static server for `dist/` on 4173 |
 | `npm run package` | Build and create the delivery ZIP with verification |
-| `npm run check` | Every gate in one run: typecheck, build, bundle budget (≤ 300,000 bytes), e2e at both sizes against a static preview of `dist/`, layout checks, perf print |
+| `npm run check` | Every gate in one run: typecheck, build, bundle budget (≤ 300,000 bytes), e2e at both sizes in 3D plus once in 2D against a static preview of `dist/`, layout checks, perf print |
 | `npm run perf` | `scripts/perfcheck.mjs`: fps, frame times, main-thread cost and heap at 6x CPU throttle in the busiest scene (prints JSON) |
 | `node scripts/e2e.mjs <url> <w> <h>` | Headless-Chrome flow test (uses the installed Google Chrome via `puppeteer-core`, dev-only) |
 | `node scripts/layoutcheck.mjs <url>` | Rotate prompt, desktop frame and mid-game resize checks |
 | `node scripts/playshot.mjs <dir> <w> <h> <rioTheme> <portoTheme>` | Captures map, intro and mid-play frames for visual review |
-| `node scripts/artcheck.mjs <png>` | Renders a contact sheet of characters, items and obstacles |
+| `node scripts/artcheck.mjs <png>` | Renders a contact sheet of the SVG characters, items and obstacles |
+| `node scripts/artcheck3d.mjs <png>` | Renders the 3D model gallery (`gallery.html`, dev server only) to a PNG for review |
+
+`MODE=2d` in front of the e2e, layout, perf or playshot script runs it against
+the SVG fallback runner (it appends `?mode=2d`); the default is the 3D runner.
 
 Add `?seed=N` to the URL for deterministic spawns (the tests use `seed=7`),
-`?perf=1` for the live performance overlay and `?nowebgl=1` to force the SVG
-water fallback. `window.passportQuest.debug` exposes read-only state for the
+`?perf=1` for the live performance overlay, `?mode=2d` for the SVG runner and
+`?nowebgl=1` to force the SVG runner with its gradient water (no WebGL at all). `window.passportQuest.debug` exposes read-only state for the
 scripts. The scripts use the Google Chrome found at the macOS path by default;
 set `CHROME_PATH` to point them at another Chrome or Chromium binary.
 `NO_STORAGE=1 node scripts/e2e.mjs …` runs the flow with `localStorage`
@@ -77,10 +85,13 @@ throwing on every access (sandboxed-iframe conditions).
 2. **Map**: choose Rio or Porto first (buttons or markers). The plane flies there.
 3. **Theme card**: pick Eat & drink, Party or Culture. Capi's costume and the
    scene change with the choice; the card shows the three items and the coupon.
-4. **Run**: move your finger or mouse up and down; Capi follows. Catch items,
-   dodge obstacles (a hit costs one bar segment, never game over). Speed and
-   obstacle density ramp up ("Faster!"). Catch 6 of the signature item to unlock
-   the theme's coupon.
+4. **Run** (3D): move your finger or mouse left and right; Capi follows across
+   the beach or quay while the world streams toward you. Tap (or Space /
+   ArrowUp) to dash through an obstacle. Catch items, dodge obstacles (a hit
+   costs one bar segment, never game over). Speed and obstacle density ramp up
+   ("Faster!"). Catch 6 of the signature item to unlock the theme's coupon.
+   In the 2D fallback (`?mode=2d`, no WebGL) Capi follows the pointer up and
+   down and ArrowUp/ArrowDown move; everything else is identical.
 5. **Redeem**: stamp card (+100), coupon won or missed, then the travel journal
    with a short real history of each item.
 6. **Map again**: the remaining city is selected automatically.
@@ -102,6 +113,9 @@ tablet was used; the developer records real-device results separately.
 | Check | Result | Mode |
 |---|---|---|
 | Loading, start screen, map hub, theme cards | pass | emulated 320×568, 390×844 |
+| 3D runner: WebGL canvas alive, world streams, Capi follows pointer X and ArrowLeft, dash, day/night worlds per theme | pass | emulated 320×568, 390×844 (software GL) |
+| 3D runner: GL context lost mid-run keeps the game running; restore resumes drawing; no errors | pass | emulated |
+| 2D fallback runner (`?mode=2d`, `?nowebgl=1`): full flow with the Stage 2 assertions | pass | emulated 320×568 |
 | Items collected once; completion fires once; continue/theme/destination double taps ignored | pass | emulated |
 | Hint after ~4 s idle; suppressed while hidden; no time jump on resume | pass | emulated |
 | Points, coupon unlock (+50), stamp bonus (+100), passport progress | pass | emulated |
@@ -118,6 +132,7 @@ tablet was used; the developer records real-device results separately.
 | No console errors, no broken assets, no external requests (5 local requests) | pass | emulated, Network observed |
 | Static-server execution of `dist/` (Python http.server) at both sizes | pass | emulated |
 | ZIP root structure and byte size | pass | script |
+| 3D look and frame rate on a phone GPU | **not verified** (headless Chrome renders GL in software) | — |
 | Music audible and balanced | **not verified** (headless has no audio output) | — |
 | Real iOS Safari / Android Chrome, pull-to-refresh, haptics, safe areas | **not tested** | — |
 
@@ -147,10 +162,15 @@ and the measurement method are in `docs/DEVELOPMENT_NOTE.md`.
 - The map's coastlines are stylized, not geographic.
 - Difficulty tuning (`level` in `src/data/destinations.ts`) is set for a
   roughly 30–45 s run per city but was validated with an autopilot, not humans.
+- The 3D runner was verified only in headless Chrome, which renders WebGL in
+  software (SwiftShader); its look and frame rate on a phone GPU are
+  unverified. Antialiasing is requested and the canvas is capped at device
+  pixel ratio 1.5. `?mode=2d` is the fallback to compare against.
 - Rotate prompt threshold: landscape viewports under 480 px tall show the
   prompt; taller landscape windows (desktop) get a centered phone frame.
-- Keyboard: arrows move Capi, Space or ArrowRight dashes. Screen readers get
-  the HUD live regions only; the run itself is visual.
+- Keyboard: ArrowLeft/ArrowRight move Capi and Space or ArrowUp dashes in 3D
+  (ArrowUp/ArrowDown and Space/ArrowRight in 2D). Screen readers get the HUD
+  live regions only; the run itself is visual.
 - Best score and mute are kept in `localStorage` when the browser allows it;
   inside a sandboxed iframe or a private window they simply reset each load.
 - The WebGL water was verified in headless Chrome, which renders GL in
@@ -166,8 +186,16 @@ index.html              app shell
 src/main.ts             boot
 src/game.ts             state machine (start, intro/map, playing, redeem, journal, final), reset()
 src/data/destinations.ts  destinations, themes, items, coupons, obstacles, level tuning and FEEL (combo, dash, golden, hit-stop) (content contract)
-src/scene/runner.ts     parallax runner scene, pointer/keyboard control, dash, spawn patterns, pooled spawns, collisions
-src/scene/water.ts      WebGL water shader under the scene (SVG gradient fallback)
+src/scene/types.ts      RunnerApi: the contract both runners implement (entities, handlers, debug accessors)
+src/scene/runner.ts     SVG parallax runner (2D fallback), pointer/keyboard control, dash, spawn patterns, pooled spawns, collisions
+src/scene/water.ts      WebGL water shader under the SVG scene (SVG gradient fallback)
+src/gl/math.ts          mat4 helpers: perspective, lookAt, TRS, projection
+src/gl/mesh.ts          low-poly mesh builder (box, cylinder, cone, sphere, disc, plane) with flat normals and vertex colours
+src/gl/renderer.ts      WebGL 1 renderer: one lit+fog shader, unlit mode, tint/alpha/wave per draw, DPR cap, context loss/restore
+src/scene3d/runner3d.ts 3D runner: lateral control, same spawn/dash/feel rules, camera, chunk streaming, Capi animation
+src/scene3d/models.ts   Capi (5 costumes, animated limbs), 18 items, 4 obstacles, ground shadow
+src/scene3d/world.ts    Rio beach and Porto quay: base, water, far landmarks, sky (day/night), scenery chunks, movers
+src/dev/gallery.ts      dev-only model gallery behind gallery.html (not built)
 src/ui/hud.ts           HUD: restart, mute, wallet, progress bar, item chips, fox guide bubble
 src/ui/screens.ts       start, map/intro, redeem, journal, final (email mock, CTA)
 src/art/*.ts            SVG art: scenes, items, capy, fox, map, passport
@@ -178,7 +206,7 @@ src/lib/storage.ts      guarded localStorage for mute and best score (no network
 src/audio/music.ts      procedural music (Web Audio), mute, hidden handling
 src/lib/*.ts            game clock (timers/tweens), rAF loop with pause reasons, DOM helpers, seeded RNG
 src/styles.css          all styling and CSS animations
-scripts/                check (all gates), package, e2e, layoutcheck, perfcheck, playshot, artcheck
+scripts/                check (all gates), package, e2e, layoutcheck, perfcheck, playshot, artcheck, artcheck3d, autopilot (shared steering, MODE=2d)
 .github/workflows/      check.yml: the same gates on every push once a remote exists
 docs/                   development note, walkthrough outline
 .claude/change-loop.md  change-loop profile for /plan-change and /implement-change
@@ -213,13 +241,15 @@ library (it is already installed in this workspace). Then:
   being asked.
 - "Ship to QA" means build and run the e2e script against the static `dist/`
   server. "Finalize" means the full gates plus `npm run package`.
-- Stage 2 work goes on a `stage2/<slug>` branch and gets its own tag; the
-  `stage1-v1` tag is never moved.
+- Stage 2 work goes on a `stage2/<slug>` branch and Stage 3 (the 3D runner)
+  on `stage3/<slug>`; each stage gets its own tag and the `stage1-v1` tag is
+  never moved.
 
 ## Credits
 
 - Game design, code and all artwork (scenes, Capi, fox, items, obstacles, map,
-  stamps): original vector work for this project.
+  stamps): original vector work for this project. The 3D models and worlds are
+  built in code from primitives with vertex colours (no textures, no assets).
 - Font: [Fredoka](https://github.com/hafontia/Fredoka-One) by Milena Brandão,
   SIL Open Font License 1.1, bundled via `@fontsource/fredoka` (latin 500/700).
 - Music: generated at runtime with the Web Audio API; no recordings used.

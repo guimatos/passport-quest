@@ -6,7 +6,8 @@ Time per section and the recording tool are left for the developer to fill in.
    - Start screen: Capi and the fox, the framing line, "Demo only" note. Tap Play.
    - Map: choose Rio. Plane flies in. Theme card: pick a theme; point at the
      costume preview and the coupon line.
-   - Run: move up and down; catch two items; show the chips, the +10, the bar.
+   - Run (3D): move left and right along Copacabana; catch two items; show
+     the chips, the +10, the bar. Pan over the sea, palms and Sugarloaf.
      Hit an obstacle on purpose: "Ouch!", bar loses one segment, no game over.
    - Tap to dash through a crab: "Dodged!", +5. Catch five in a row: the x2
      badge on the wallet and "Combo x2!"; a hit floats "Combo lost!".

@@ -60,9 +60,9 @@
 - Modify: `src/scene3d/runner3d.ts` (use the models; limb animation; item bob/spin; golden tint; pop/bump/dodge/fade animations; ground shadows)
 - Create: `gallery.html`, `src/dev/gallery.ts` (dev-only contact sheet, not part of the build), `scripts/artcheck3d.mjs`
 
-- [ ] **Step 1: Implement**. Capi: shirt/shorts/accent from the costume palette in `src/art/capy.ts` (exported as `COSTUME_COLORS`), fur head with snout, ears, eyes, nose, hat per costume; legs and arms as separate meshes rotated by a sine run cycle; moods run/ouch/cheer. Items and obstacles as 3–8 primitives each, sized to about 0.6 units.
-- [ ] **Step 2: Check** `node scripts/artcheck3d.mjs <png>` renders every model in a grid (visual review); e2e asserts a golden item is seen and collected entities disappear.
-- [ ] **Step 3: Gates and commit** "Add low-poly Capi, items and obstacles for the 3D runner".
+- [x] **Step 1: Implement**. Capi: shirt/shorts/accent from the costume palette in `src/art/capy.ts` (exported as `COSTUME_COLORS`), fur head with snout, ears, eyes, nose, hat per costume; legs and arms as separate meshes rotated by a sine run cycle; moods run/ouch/cheer. Items and obstacles as 3–8 primitives each, sized to about 0.6 units.
+- [x] **Step 2: Check** `node scripts/artcheck3d.mjs <png>` renders every model in a grid (visual review); e2e asserts a golden item is seen and collected entities disappear.
+- [x] **Step 3: Gates and commit** "Add low-poly Capi, items and obstacles for the 3D runner".
 
 ### Task 3: Worlds: Rio beach and Porto quay, themes and night
 
@@ -72,9 +72,9 @@
 - Create: `src/scene3d/world.ts`
 - Modify: `src/scene3d/runner3d.ts` (world instance: chunks, water, far landmarks, sky, ambient motion)
 
-- [ ] **Step 1: Implement**. Rio: sand band, wet-sand foam line, wave-displaced sea on the right, Copacabana wave-pattern promenade with palms and umbrellas on the left, Sugarloaf and hills far ahead, sun and clouds; theme furniture: kiosks (food), string lights at night (party), cable-car cabin on a line to the Sugarloaf (culture). Porto: cobble quay, Douro on the right with rabelo boats, Ribeira facades with window boxes on the left, the Dom Luís arch crossing overhead every third chunk, Gaia hills; furniture: café tables (food), São João balloons and lights at night (party), a tram on the quay (culture). Night sky colours from `SCENE_ART[...].variants.party.bg`.
-- [ ] **Step 2: Check** `node scripts/playshot.mjs <dir> 320 568 food party` and `... culture culture` screenshots reviewed; e2e asserts the world reports the expected variant (`debug.world === 'brazil:food:day'` etc.).
-- [ ] **Step 3: Gates and commit** "Add Rio beach and Porto quay 3D worlds with theme and night variants".
+- [x] **Step 1: Implement**. Rio: sand band, wet-sand foam line, wave-displaced sea on the right, Copacabana wave-pattern promenade with palms and umbrellas on the left, Sugarloaf and hills far ahead, sun and clouds; theme furniture: kiosks (food), string lights at night (party), cable-car cabin on a line to the Sugarloaf (culture). Porto: cobble quay, Douro on the right with rabelo boats, Ribeira facades with window boxes on the left, the Dom Luís arch crossing overhead every third chunk, Gaia hills; furniture: café tables (food), São João balloons and lights at night (party), a tram on the quay (culture). Night sky colours from `SCENE_ART[...].variants.party.bg`.
+- [x] **Step 2: Check** `node scripts/playshot.mjs <dir> 320 568 food party` and `... culture culture` screenshots reviewed; e2e asserts the world reports the expected variant (`debug.world === 'brazil:food:day'` etc.).
+- [x] **Step 3: Gates and commit** "Add Rio beach and Porto quay 3D worlds with theme and night variants".
 
 ### Task 4: Feel, robustness and performance
 
@@ -83,9 +83,9 @@
 **Files:**
 - Modify: `src/scene3d/runner3d.ts`, `src/gl/renderer.ts`, `src/styles.css`, `scripts/e2e.mjs`, `scripts/check.mjs`
 
-- [ ] **Step 1: Implement** lane lean, squash on catch, dash lunge with ghost copies, stun blink, finish cheer, camera bob, hint arrow, `prefers-reduced-motion` (no lean/ghosts, still water), context loss (canvas hidden behind a sky gradient, meshes re-uploaded on restore), DPR cap 1.5, draw-call counter.
-- [ ] **Step 2: Check** e2e: reduced-motion reported, context loss simulated via `WEBGL_lose_context` leaves no error and the run continues; `scripts/check.mjs` runs the 2D e2e too and enforces the budget. Perf measured with `node scripts/perfcheck.mjs`.
-- [ ] **Step 3: Gates and commit** "Polish the 3D runner: lean, dash ghosts, stun, cheer, reduced motion, context loss".
+- [x] **Step 1: Implement** lane lean, squash on catch, dash lunge with ghost copies, stun blink, finish cheer, camera bob, hint arrow, `prefers-reduced-motion` (no lean/ghosts, still water), context loss (canvas hidden behind a sky gradient, meshes re-uploaded on restore), DPR cap 1.5, draw-call counter.
+- [x] **Step 2: Check** e2e: reduced-motion reported, context loss simulated via `WEBGL_lose_context` leaves no error and the run continues; `scripts/check.mjs` runs the 2D e2e too and enforces the budget. Perf measured with `node scripts/perfcheck.mjs`.
+- [x] **Step 3: Gates and commit** "Polish the 3D runner: lean, dash ghosts, stun, cheer, reduced motion, context loss".
 
 ### Task 5: Documentation
 
@@ -94,4 +94,4 @@
 **Files:**
 - Modify: `README.md` (how to play, scripts, project structure, limitations, testing table), `docs/DEVELOPMENT_NOTE.md` (new "3D runner (Stage 3)" section: decisions, measurements, problems; AI section untouched), `.claude/change-loop.md` (new contracts: `RunnerApi`, debug fields, `MODE=2d`)
 
-- [ ] **Step 1: Write** the docs; **Step 2: Gates** `npm run check`; **Step 3: Commit** "Document the 3D runner".
+- [x] **Step 1: Write** the docs; **Step 2: Gates** `npm run check`; **Step 3: Commit** "Document the 3D runner".

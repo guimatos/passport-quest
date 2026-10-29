@@ -1,4 +1,4 @@
-# Development note — Passport Quest (Stage 1 and Stage 2 polish)
+# Development note — Passport Quest (Stage 1, Stage 2 polish, Stage 3 3D)
 
 ## Tools and libraries
 
@@ -10,12 +10,12 @@
 | `puppeteer-core` | headless-Chrome test scripts, uses the installed Google Chrome | no (dev-only) |
 | Python 3 `http.server` | static-server test of `dist/` | no |
 | Web Audio API | procedural background music | browser API |
-| WebGL 1 | water shader (`src/scene/water.ts`), SVG fallback | browser API |
+| WebGL 1 | 3D runner (`src/gl/*`, `src/scene3d/*`, Stage 3) and the water shader of the 2D runner (`src/scene/water.ts`); SVG runner as fallback | browser API |
 | Canvas 2D | pooled particles (`src/fx/particles.ts`) | browser API |
 
 No game framework and no runtime npm dependency. Runtime assets are the bundled
 JS, CSS and the four font files; there are no images, audio files or external
-URLs. The production build is about 233 KB on disk (`npm run check` enforces a 300,000-byte budget).
+URLs. The production build is about 280 KB on disk since Stage 3 (`npm run check` enforces a 300,000-byte budget); the whole 3D stack is about 40 KB minified.
 
 ## Assets
 
@@ -27,6 +27,10 @@ URLs. The production build is about 233 KB on disk (`npm run check` enforces a 3
   screen, HUD speech bubble, redeem card, final screen).
 - **Capi the capybara**: original player character, drawn upright with themed
   clothes and hats.
+- **3D models and worlds** (Stage 3): built in code from boxes, cylinders,
+  cones, spheres and discs with vertex colours (`src/scene3d/models.ts`,
+  `src/scene3d/world.ts`); no textures, no model files, no assets. Palette
+  taken from the SVG art.
 - **Font**: Fredoka, SIL Open Font License 1.1, from the `@fontsource/fredoka`
   package; license text ships in `node_modules/@fontsource/fredoka/LICENSE`
   and is credited in the README.
@@ -200,7 +204,121 @@ Keyboard: ArrowUp/ArrowDown move, Space/ArrowRight dash. This closes the Stage
 Onboarding: the move hint shows for 1.6 s at level start (ghost hand) before
 the 4 s idle hint takes over; the first fox line says "Tap to dash!".
 
+## 3D runner (Stage 3)
+
+The run became a 3D world; the loop, screens, HUD, data, effects and the Stage
+2b feel rules are unchanged. The SVG runner stays as the fallback.
+
+**Decisions**
+
+- **No library.** The bundle budget (300,000 bytes, 240 KB already used) rules
+  out Three.js or Babylon (hundreds of KB minified), and the profile forbids
+  runtime dependencies. The renderer is WebGL 1 in about 40 KB: one shader
+  (per-vertex colour, one directional light plus ambient, distance fog toward
+  the horizon colour, an unlit mode, a per-draw tint, alpha and vertex wave),
+  a mesh builder for primitives with flat normals, and 4×4 matrix helpers.
+  Every model is one interleaved buffer and one draw call; a frame is 35–50
+  draw calls.
+- **One contract, two runners.** `src/scene/types.ts` (`RunnerApi`) is what
+  the game drives. `Runner3D` mirrors `Runner`: the same spawn timing, spawn
+  patterns, dash window and cooldown, stun, golden odds and collision roles,
+  so `level` and `FEEL` tuning carry over untouched. Scene speed in 2D units
+  per second divides by 16 to become world units per second; spawns appear
+  62 units ahead so the first reaction window is longer than in 2D while the
+  item throughput per minute is identical.
+- **Lateral control.** The pointer's horizontal position across the stage maps
+  linearly onto the play band (±2 units, slightly widened so the edges are
+  reachable), independent of perspective, so a finger position always means
+  the same lane. Keyboard: ArrowLeft/ArrowRight move, Space/ArrowUp dash.
+- **Camera.** Behind and above Capi (eye at 4.8 up, 8.6 back; 64° vertical
+  field of view), following 40 % of Capi's lateral offset so the band stays
+  on screen at 320×568 and 390×844.
+- **Worlds as recyclable chunks.** Each city has three 24-unit scenery chunks
+  (promenade mosaic, palms, umbrellas, buildings; cobbles, facades with
+  windows, bollards, the Dom Luís arch every third chunk). Seven are visible;
+  when one passes the camera it moves to the far end and the variant cycle
+  rotates, so the street never repeats visibly in one screen. Theme
+  furniture (kiosks, café tables, string lights, rails, a footvolley net) and
+  the night sky (party themes) are baked into the chunks and sky at level
+  start; nothing allocates per frame. "Movers" (boats, clouds, the cable car,
+  São João balloons, a tram) are a handful of meshes with a position update.
+- **Night** is a sky gradient with stars and a moon, lower ambient light and
+  an intensity multiplier on lit colours, so the day palette is reused.
+- **Feel in 3D.** Lane lean (roll toward the lateral velocity), squash on a
+  catch, dash lunge with two ghost copies, stun blink, cheer at level end
+  (arms up, hop), item bob and spin (golden ones faster and tinted), pop,
+  tumble and spin-away animations on catch, hit and dodge, ground shadow
+  discs for depth, entity fade on finish. All are counters in `update(dt)`,
+  so they pause with the game.
+- **Robustness.** The canvas is created per level and `destroy()` loses the
+  context on purpose (the restart loop asserts no canvas, no context). A lost
+  context at runtime hides the canvas behind a CSS sky gradient while the
+  world keeps running; on restore the program is rebuilt and every mesh
+  re-uploads lazily (meshes keep their CPU data). No WebGL at all, `?nowebgl=1`
+  or `?mode=2d` use the SVG runner. `prefers-reduced-motion` removes lean,
+  ghosts, water waves, bob and drifting movers. Device pixel ratio is capped
+  at 1.5 like the particle canvas.
+
+**Testing.** The dev-only scripts share one in-page autopilot
+(`scripts/autopilot.mjs`) that steers by pointer X in 3D and pointer Y in
+2D; `MODE=2d` runs any script against the fallback. The e2e asserts, in 3D,
+the live context and draw calls, pointer and keyboard control, the day and
+night world names, a golden spawn counted by the runner, context loss and
+restore, and the same teardown invariants as before. `npm run check` runs the
+e2e at both sizes in 3D and once in 2D. `gallery.html` (dev server only) and
+`scripts/artcheck3d.mjs` render every model for review.
+
+**Measurements** (`node scripts/perfcheck.mjs`, 320×568 @2x, 6x CPU throttle,
+15 s of autopilot, same session, two rounds each; the busiest scene for the
+2D runner, Rio Party at night, is the same world the 3D run loads). "Main
+thread" is the renderer process only: headless Chrome rasterises WebGL with
+SwiftShader in the GPU process, which these numbers do not include, so the
+3D row says how much the page's own thread works, not what a phone GPU will
+spend.
+
+| Runner | fps avg | frame worst ms | JS/frame avg ms | main thread busy % | task ms | style ms | layout ms | nodes / draw calls | heap MB |
+|---|---|---|---|---|---|---|---|---|---|
+| 3D (WebGL), round 1 | 60 | 18 | 0.35 | 11.0 | 1645 | 227 | 112 | 6 nodes, 25 draws | 7 |
+| 3D (WebGL), round 2 | 60 | 20 | 0.28 | 8.5 | 1275 | 170 | 104 | 6 nodes, 25 draws | 7 |
+| 2D (SVG fallback), round 1 | 60 | 22 | 0.41 | 37.3 | 5597 | 1110 | 250 | 889 nodes | 2 |
+| 2D (SVG fallback), round 2 | 60 | 22 | 0.38 | 36.9 | 5538 | 1072 | 242 | 891 nodes | 2 |
+
+Reading the table: the 3D scene removes the style and layout work of the
+SVG scene (six DOM nodes instead of about 890), so the main thread is mostly
+idle; what remains is the HUD, effects canvas and JS. The GPU cost is the
+open question for real devices: a frame is 25–50 draw calls and a few
+thousand triangles, which is small for any phone GPU of the last decade,
+but it has not been measured on one.
+
+**Problems and solutions**
+
+1. **Software GL in headless Chrome.** SwiftShader draws the 3D scene slowly,
+   so the autopilot's completion times in the e2e are about the same as in 2D
+   only because the game clock is frame-independent; a perf number from
+   headless is an upper bound. The scripts keep their timeouts generous.
+2. **Steering tests across perspectives.** Projecting an item to the screen
+   and moving the pointer there would depend on the camera; instead the
+   control mapping is linear and `debug.toScreen(x, 0)` is its exact inverse,
+   so the autopilot targets a lane, not a pixel.
+3. **A flaky golden assertion.** Sampling the entity list every 100 ms missed
+   golden items; with seed 7 a city may spawn none at all. The runner now
+   counts golden spawns (`feel.goldens`) and the e2e checks the trip total.
+4. **Z-fighting on overlays.** Promenade, wet sand, curb and shadows are thin
+   planes on the ground; they sit 1–5 cm apart in height and the fog hides
+   the far-distance flicker.
+5. **Culled discs.** The sun, moon and stars are one-sided discs; a rotation
+   of +90° about x makes them face the camera, −90° culls them silently.
+6. **Bundle budget.** The 3D stack added about 40 KB; the build is 280 KB
+   of 300,000 bytes. The two `.woff` files (40 KB) could go if the budget
+   ever binds, since every target browser reads `.woff2`.
+
 ## Known limitations and unfinished work
+
+- The 3D runner was verified only in headless Chrome (software GL): frame
+  rate, antialiasing quality and heat on a phone GPU are unverified. The
+  models are deliberately low-poly (a frame is a few thousand triangles).
+- The hint arrow in 3D is a fixed overlay above Capi rather than a marker in
+  the world; the fox's text says "left and right".
 
 - Not tested on real devices; all results are emulated headless Chrome.
 - Headless Chrome renders WebGL with SwiftShader (software), so the water's
