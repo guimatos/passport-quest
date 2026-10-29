@@ -164,8 +164,8 @@ node scripts/layoutcheck.mjs http://localhost:5173/
 ```
 
 The same gates run in GitHub Actions on every push and pull request
-(`.github/workflows/check.yml`) once the repository has a remote; the workflow
-installs Chrome and passes its path through `CHROME_PATH`. Performance numbers
+(`.github/workflows/check.yml`, repository github.com/guimatos/passport-quest);
+the workflow installs Chrome and passes its path through `CHROME_PATH`. Performance numbers
 and the measurement method are in `docs/DEVELOPMENT_NOTE.md`.
 
 ## Known limitations

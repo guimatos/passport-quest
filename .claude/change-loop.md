@@ -35,10 +35,10 @@ Code generation: none.
 
 ## Git flow
 
-- Base branch for new work: `main` (local repo, no remote yet). Stages 1, 2, 2b and 3 are all merged into `main` (linear history; `stage2/polish-perf` and `stage3/3d-runner` are kept only as history)
+- Base branch for new work: `main` (remote: `origin` = github.com/guimatos/passport-quest, public). Stages 1, 2, 2b and 3 are all merged into `main` (linear history; `stage2/polish-perf` and `stage3/3d-runner` are kept only as history)
 - Branch name: `<topic>/<slug>` from `main`; merge back (fast-forward when possible) once `npm run check` is green. Tag `stage1-v1` stays untouched
 - Commit message: imperative subject, optional body with the why; end with the `Co-Authored-By` line when an agent wrote the code
-- PR: none (no remote). If a remote is added, one PR per change targeting `main`
+- PR: optional; one PR per change targeting `main` on github.com/guimatos/passport-quest. Never push or tag unasked
 - Keeping current: n/a (single author)
 - QA / staging: none. "Ship to QA" means: `npm run build`, serve `dist/` statically and run `node scripts/e2e.mjs http://localhost:4173/ 320 568`
 - Release: `npm run package` → `release/passport-quest-stage1.zip` (the ZIP name and the `RUN.txt` label in `scripts/package.mjs` still say Stage 1; update them when packaging a later stage); tag the delivered commit (`stage1-v1`, `stage2-v1`, `stage3-v1`…). Never move an existing tag.
