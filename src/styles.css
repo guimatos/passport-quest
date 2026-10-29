@@ -773,6 +773,7 @@ g:nth-child(3n) > .bulb { animation-delay: -1.1s; }
 
 /* ---------- map hub: destination choice ---------- */
 .dest-list { display: flex; gap: 8px; width: min(100%, 300px); margin-top: 4px; }
+.dest-list[hidden] { display: none; } /* display:flex would otherwise override the hidden attribute once a city is picked */
 .dest-btn {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
   background: var(--cream); color: var(--ink); border: 0; border-radius: 14px; padding: 8px 6px;
@@ -915,3 +916,9 @@ g:nth-child(3n) > .bulb { animation-delay: -1.1s; }
 /* ---------- Stage 2b: depth ---------- */
 .entity-shadow { pointer-events: none; }
 .runner-lean { will-change: transform; }
+
+/* ---------- Stage 2b: best score ---------- */
+.best-line { font-size: 13px; margin-top: 6px; opacity: 0.9; }
+.best-line b { color: #FFD966; }
+.final-best { font-size: 12px; opacity: 0.85; justify-content: center; }
+.final-best--new { color: #FFD966; font-weight: 700; opacity: 1; animation: combo-pop 0.5s cubic-bezier(.34,1.56,.64,1); }

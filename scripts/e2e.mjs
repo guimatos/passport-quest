@@ -17,6 +17,9 @@ page.on('console', (m) => { logs.push(`${m.type()}: ${m.text()}`); if (m.type() 
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('requestfailed', (r) => errors.push('REQUEST FAILED ' + r.url()));
 page.on('request', (r) => requests.push(r.url()));
+// NO_STORAGE=1 simulates a sandboxed iframe / blocked site data: localStorage throws on access and the game must not care.
+const NO_STORAGE = !!process.env.NO_STORAGE;
+if (NO_STORAGE) await page.evaluateOnNewDocument(() => { Object.defineProperty(window, 'localStorage', { get() { throw new Error('blocked'); } }); });
 await page.goto(url, { waitUntil: 'networkidle0' });
 
 const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/${name}.png` }); };
@@ -74,12 +77,16 @@ await page.tap('.dest-btn[data-dest="brazil"]');
 await page.tap('.dest-btn[data-dest="portugal"]').catch(() => {});
 await sleep(1900); await shot('01b-intro');
 check(await page.$eval('.intro-card', (e) => e.classList.contains('show')), 'intro card shown after the plane lands');
+check(await page.$eval('.dest-list', (e) => e.offsetParent === null), 'city buttons hidden once a city is picked');
 check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Rio')), 'first pick (Rio) wins over the second tap');
 check((await page.$$('.theme-btn')).length === 3, 'intro offers 3 themes');
 await page.tap('.theme-btn[data-theme="food"]');
 await page.tap('.theme-btn[data-theme="party"]').catch(() => {});
 await sleep(500);
 check((await state()) === 'playing', 'choosing a theme enters playing (second tap ignored)');
+check(await hintVisible(), 'ghost hand shown at level start');
+await sleep(1700);
+check(!(await hintVisible()) || (await dbg()).progress > 0, 'ghost hand hides after ~1.6 s');
 check((await dbg()).chosen.brazil === 'food', 'chosen theme recorded (food)');
 check((await page.$$('.chip')).length === 3, 'HUD shows the 3 items of the chosen theme');
 check(await page.$eval('.hud-toast', (e) => getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)'), 'toast has a solid backing');
@@ -177,6 +184,8 @@ check((await state()) === 'final', 'final screen');
 await shot('07-final');
 const finalPts = await page.$eval('.final-wallet strong', (e) => Number(e.textContent));
 check(finalPts >= 34 * 10 + 200, `final total shown (${finalPts})`);
+check(await page.$eval('.final-best', (e) => e.textContent.includes('New best')), 'first trip is a new best');
+if (!NO_STORAGE) check(await page.evaluate(() => localStorage.getItem('passport-quest:best')) === String(finalPts), 'best score persisted');
 await page.tap('.btn--cta');
 await sleep(200);
 check(logs.some((l) => l.includes('CTA clicked')), 'CTA console.log');
@@ -202,6 +211,12 @@ check((await state()) === 'start', 'restart from final -> start');
 // Repeated restarts from various states, including mid-intro, mid-redeem and mid-journal
 for (let i = 0; i < 12; i++) {
   await page.tap('.btn--play'); await sleep(350);
+  if (i === 0) {
+    await page.tap('.btn--mute'); await sleep(50);
+    check(await page.$eval('.btn--mute', (e) => e.getAttribute('aria-pressed') === 'true'), 'mute button pressed');
+    if (!NO_STORAGE) check(await page.evaluate(() => localStorage.getItem('passport-quest:muted')) === '1', 'mute persisted');
+    await page.tap('.btn--mute'); await sleep(50);
+  }
   if (i % 4 === 2) { await page.tap('.dest-btn[data-dest="portugal"]'); await sleep(2200); check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Porto')), `iteration ${i}: Porto chosen first`); await page.tap('.btn--restart'); await sleep(60); check((await state()) === 'start', `restart iteration ${i} -> start`); continue; }
   await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(50);
   if (i % 4 === 3) { check((await state()) === 'intro', `iteration ${i}: restart from intro`); await page.tap('.btn--restart'); await sleep(60); check((await state()) === 'start', `restart iteration ${i} -> start`); continue; }
@@ -238,6 +253,8 @@ check(!(await page.$eval('#app', (e) => e.classList.contains('reduced-motion')))
 
 await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="party"]'); await sleep(400);
 check((await state()) === 'playing' && (await dbg()).points === 0, 'points reset after restarts');
+check(await page.$eval('.btn--mute', (e) => e.getAttribute('aria-pressed') === 'false'), 'mute state (unmuted) restored from storage after restarts');
+check((await page.evaluate(() => window.passportQuest.debug.best)) === (NO_STORAGE ? 0 : finalPts), `best score ${NO_STORAGE ? 'is 0 without storage' : 'survives restarts'}`);
 await autopilot(2500, 'item');
 check((await page.evaluate(() => window.passportQuest.debug.particles)) > 0, 'canvas particles active during play (dust/sparkles)');
 

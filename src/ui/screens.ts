@@ -20,7 +20,7 @@ export type Chosen = Partial<Record<DestinationDef['id'], ThemeId>>;
 
 const themeIcon = (id: ThemeId) => `<svg viewBox="-14 -14 28 28" class="theme-icon" aria-hidden="true">${THEME_ICONS[id]}</svg>`;
 
-export function renderStart(root: HTMLElement, onPlay: () => void, signal: AbortSignal) {
+export function renderStart(root: HTMLElement, best: number, onPlay: () => void, signal: AbortSignal) {
   root.innerHTML = `
     <section class="screen screen--start">
       <div class="skyline-wrap">${SKYLINE_SVG}</div>
@@ -38,7 +38,8 @@ export function renderStart(root: HTMLElement, onPlay: () => void, signal: Abort
         <li><b>2</b><span>Play</span><small>catch &amp; earn</small></li>
         <li><b>3</b><span>Redeem</span><small>stamps &amp; coupons</small></li>
       </ol>
-      <p class="instruction">Move <b>up and down</b> to catch items and dodge obstacles.</p>
+      <p class="instruction">Move <b>up and down</b> to catch items. <b>Tap</b> to dash through obstacles.</p>
+      ${best > 0 ? `<p class="best-line">Your best: <b>${best}</b> demo pts</p>` : ''}
       <button class="btn btn--primary btn--play" type="button">Play</button>
       <p class="framing">${FRAMING}</p>
       <p class="demo-note">${DEMO_NOTE}</p>
@@ -180,7 +181,9 @@ export function renderJournal(root: HTMLElement, dest: DestinationDef, theme: Th
 
 export interface FinalHandlers { onCta: () => void; onRestart: () => void; onSendCoupons: (email: string) => void }
 
-export function renderFinal(root: HTMLElement, points: number, counts: Counts, chosen: Chosen, coupons: string[], h: FinalHandlers, signal: AbortSignal) {
+export interface FinalScore { best: number; newBest: boolean }
+
+export function renderFinal(root: HTMLElement, points: number, counts: Counts, chosen: Chosen, coupons: string[], score: FinalScore, h: FinalHandlers, signal: AbortSignal) {
   const lastDest = DESTINATIONS[DESTINATIONS.length - 1];
   const lastCostume = themeOf(lastDest, chosen[lastDest.id] ?? lastDest.themes[0].id).costume;
   const won = DESTINATIONS.flatMap((d) => d.themes.filter((t) => coupons.includes(`${d.id}:${t.id}`)).map((t) => t.coupon.title));
@@ -208,6 +211,7 @@ export function renderFinal(root: HTMLElement, points: number, counts: Counts, c
       <div class="final-wallet">
         <div class="final-wallet-row"><span class="wallet-coin" aria-hidden="true"></span><strong>${points}</strong> <span>demo points</span></div>
         <div class="final-wallet-row final-coupons">${TICKET_SVG}<span>${won.length ? won.join(' · ') : 'No coupons this trip'}</span></div>
+        <div class="final-wallet-row final-best ${score.newBest ? 'final-best--new' : ''}">${score.newBest ? 'New best!' : `Best: ${score.best} demo pts`}</div>
       </div>
       <p class="demo-note">${DEMO_NOTE}</p>
       <form class="email-form" novalidate>

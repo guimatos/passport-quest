@@ -12,6 +12,7 @@ import { renderStart, renderRedeem, renderJournal, renderIntro, markIntroDestina
 import { Music } from './audio/music';
 import { MAP_POINTS, MAP_W } from './art/map';
 import { PerfOverlay } from './lib/perf';
+import { storage } from './lib/storage';
 
 export type GameState = 'start' | 'intro' | 'playing' | 'redeem' | 'journal' | 'final';
 
@@ -77,6 +78,8 @@ export class Game {
   private hitStop = 0;
   private dodges = 0;
   private hits = 0; // debug counter
+  /** Best trip total, read from storage on init; a preference, so reset() keeps it. */
+  private best = 0;
   private get multiplier() { return Math.min(FEEL.comboMax, 1 + Math.floor(this.combo / FEEL.comboStep)); }
 
   private readonly app = $('#app');
@@ -89,6 +92,7 @@ export class Game {
     this.loop = new Loop((dt) => this.frame(dt), (paused) => this.app.classList.toggle('paused', paused));
     this.fx = new Fx($('#fx'), $<HTMLCanvasElement>('#fx-canvas'), this.clock);
     this.hud = new Hud($('#hud'));
+    this.music.setMuted(storage.get('muted') === '1');
     if (new URLSearchParams(location.search).has('perf')) this.perf = new PerfOverlay(this.stage, this.sceneRoot);
   }
 
@@ -160,6 +164,7 @@ export class Game {
     this.loop.setPaused('hidden', document.visibilityState === 'hidden');
     this.checkOrientation();
     this.loop.start();
+    this.best = Number(storage.get('best') ?? 0) || 0;
     this.enterStart();
   }
 
@@ -192,12 +197,12 @@ export class Game {
   private enterStart() {
     this.setState('start');
     this.app.style.setProperty('--scene-bg', '#201338');
-    renderStart(this.overlay, () => { this.music.unlock(); this.music.play('menu'); this.wipeTo(() => this.enterMap()); }, this.ac.signal);
+    renderStart(this.overlay, this.best, () => { this.music.unlock(); this.music.play('menu'); this.wipeTo(() => this.enterMap()); }, this.ac.signal);
   }
 
   private mountHud() {
     if (!$('#hud').childElementCount) {
-      this.hud.mount(() => this.reset(), () => { this.music.setMuted(!this.music.muted); return this.music.muted; }, this.music.muted, this.ac.signal);
+      this.hud.mount(() => this.reset(), () => { this.music.setMuted(!this.music.muted); storage.set('muted', this.music.muted ? '1' : '0'); return this.music.muted; }, this.music.muted, this.ac.signal);
     }
   }
 
@@ -297,6 +302,9 @@ export class Game {
     this.say(this.completedDests.length === 0 ? 'Move up and down. Tap to dash!' : `${dest.name}! Faster this time.`, 2400);
     this.clock.after(2600, () => this.say(`Catch ${theme.coupon.need} ${couponItem.label.toLowerCase()}s for a coupon!`, 2600));
     this.armHint();
+    // Ghost hand: show the move hint right away for a moment; the idle hint (armHint) takes over after that.
+    this.runner.setHint(true);
+    this.clock.after(1600, () => { if (this.state === 'playing') this.runner?.setHint(false); });
   }
 
   private collect(e: Entity, screen: { x: number; y: number }) {
@@ -425,7 +433,9 @@ export class Game {
     this.app.style.setProperty('--scene-bg', '#201338');
     const allCounts: Counts = { ...this.allCountsStore, ...this.counts };
     this.music.play('menu');
-    renderFinal(this.overlay, this.points, allCounts, this.chosen, this.coupons, {
+    const newBest = this.points > this.best;
+    if (newBest) { this.best = this.points; storage.set('best', String(this.best)); }
+    renderFinal(this.overlay, this.points, allCounts, this.chosen, this.coupons, { best: this.best, newBest }, {
       onCta: () => this.onCta(),
       onRestart: () => this.reset(),
       onSendCoupons: (email) => this.onSendCoupons(email),
@@ -528,6 +538,7 @@ export class Game {
       hitStop: this.hitStop,
       dodges: this.dodges,
       hits: this.hits,
+      best: this.best,
     };
   }
 }
