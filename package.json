@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "serve:dist": "python3 -m http.server 4173 --directory dist",
     "package": "npm run build && node scripts/package.mjs",
-    "perf": "node scripts/perfcheck.mjs"
+    "perf": "node scripts/perfcheck.mjs",
+    "check": "node scripts/check.mjs"
   },
   "devDependencies": {
     "@fontsource/fredoka": "^5.3.0",

@@ -56,13 +56,18 @@ listing and fails if `index.html` is not at the root or the ZIP exceeds
 | `npm run preview` | Vite preview of `dist/` |
 | `npm run serve:dist` | Python static server for `dist/` on 4173 |
 | `npm run package` | Build and create the delivery ZIP with verification |
+| `npm run check` | Every gate in one run: typecheck, build, bundle budget (≤ 300,000 bytes), e2e at both sizes against a static preview of `dist/`, layout checks, perf print |
+| `npm run perf` | `scripts/perfcheck.mjs`: fps, frame times, main-thread cost and heap at 6x CPU throttle in the busiest scene (prints JSON) |
 | `node scripts/e2e.mjs <url> <w> <h>` | Headless-Chrome flow test (uses the installed Google Chrome via `puppeteer-core`, dev-only) |
 | `node scripts/layoutcheck.mjs <url>` | Rotate prompt, desktop frame and mid-game resize checks |
 | `node scripts/playshot.mjs <dir> <w> <h> <rioTheme> <portoTheme>` | Captures map, intro and mid-play frames for visual review |
 | `node scripts/artcheck.mjs <png>` | Renders a contact sheet of characters, items and obstacles |
 
-Add `?seed=N` to the URL for deterministic spawns (the tests use `seed=7`).
-`window.passportQuest.debug` exposes read-only state for the scripts.
+Add `?seed=N` to the URL for deterministic spawns (the tests use `seed=7`),
+`?perf=1` for the live performance overlay and `?nowebgl=1` to force the SVG
+water fallback. `window.passportQuest.debug` exposes read-only state for the
+scripts. The scripts use the Google Chrome found at the macOS path by default;
+set `CHROME_PATH` to point them at another Chrome or Chromium binary.
 
 ## How to play (reviewer notes)
 
@@ -117,11 +122,19 @@ tablet was used; the developer records real-device results separately.
 Run the same checks yourself:
 
 ```bash
-npm run dev &  # or npm run build && npm run serve:dist
+npm run check   # all gates against a static preview of dist/ (about 5 minutes)
+
+# or individually, against the dev server:
+npm run dev &
 node scripts/e2e.mjs http://localhost:5173/ 320 568
 node scripts/e2e.mjs http://localhost:5173/ 390 844
 node scripts/layoutcheck.mjs http://localhost:5173/
 ```
+
+The same gates run in GitHub Actions on every push and pull request
+(`.github/workflows/check.yml`) once the repository has a remote; the workflow
+installs Chrome and passes its path through `CHROME_PATH`. Performance numbers
+and the measurement method are in `docs/DEVELOPMENT_NOTE.md`.
 
 ## Known limitations
 

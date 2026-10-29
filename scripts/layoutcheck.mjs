@@ -1,7 +1,8 @@
 // Dev-only: landscape rotate prompt, desktop frame, and mid-game resize/orientation checks.
 import puppeteer from 'puppeteer-core';
+const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const url = (process.argv[2] ?? 'http://localhost:4173/') + '?seed=5';
-const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));

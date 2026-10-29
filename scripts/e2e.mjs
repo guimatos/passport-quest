@@ -6,7 +6,7 @@ import puppeteer from 'puppeteer-core';
 const base = process.argv[2] ?? 'http://localhost:5173/';
 const url = base + (base.includes('?') ? '&' : '?') + 'seed=7';
 const W = Number(process.argv[3] ?? 320), H = Number(process.argv[4] ?? 568);
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const shots = process.env.SHOTS ?? '';
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-first-run'] });
