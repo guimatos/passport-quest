@@ -88,14 +88,15 @@ protocol; 15 s of autopilot play). "Main thread" columns are the renderer's
 cumulative task / style-recalc / layout durations over the window, read from
 `Performance.getMetrics`; "busy" is task time divided by wall time. Frame
 rate stays vsync-bound at 60 fps in every build, so the main-thread columns
-are the ones that move. Runs vary by about ±10%; each row is the median of
-three runs. `?perf=1` shows the live overlay in any build.
+are the ones that move. Runs vary by about ±5 points of busy time on the same machine; each row is
+the median of three to five runs. `?perf=1` shows the live overlay in any build.
 
 | Build | fps avg | frame worst ms | JS/frame avg ms | main thread busy % | task ms | style ms | layout ms | SVG nodes | heap MB |
 |---|---|---|---|---|---|---|---|---|---|
 | Stage 1 baseline (before Stage 2 work) | 60 | 24 | 0.52 | 48.5 | 7278 | 1468 | 351 | 876 | 3 |
 | + entity node pooling, cached scene rects | 60 | 23 | 0.34 | 36.9 | 5530 | 1130 | 263 | 875 | 3 |
 | + canvas particles (sparkles, trails, dust, confetti), squash, shake, flash, wipe | 60 | 22 | 0.44 | 38.8 | 5822 | 1075 | 282 | 875 | 3 |
+| + WebGL water shader (band-sized canvas, 30 fps redraw) | 60 | 22 | 0.51 | 41.8 | 6266 | 1191 | 261 | 878 | 3 |
 
 ## AI correction / rejected output — written by developer
 

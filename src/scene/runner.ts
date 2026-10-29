@@ -1,6 +1,7 @@
 import type { DestinationDef, ItemId, ObstacleId, ThemeDef } from '../data/destinations';
 import { ITEM_ART, OBSTACLE_ART } from '../art/items';
-import { SCENE_ART, sceneLayers, type ParallaxLayer } from '../art/scenes';
+import { SCENE_ART, WATER, sceneLayers, type ParallaxLayer } from '../art/scenes';
+import { Water } from './water';
 import { capyGroup, type CapyMood } from '../art/capy';
 import { svgFromString, SVG_NS } from '../lib/dom';
 
@@ -52,6 +53,9 @@ export class Runner {
   private finished = false;
   private stunned = 0;
   private hintOn = false;
+  private elapsedTotal = 0;
+  /** WebGL water under the SVG, or null when unavailable (SVG gradient shows instead). */
+  water: Water | null = null;
 
   constructor(
     private dest: DestinationDef,
@@ -101,7 +105,8 @@ export class Runner {
     };
     stage.addEventListener('pointermove', follow, { signal, passive: true });
     stage.addEventListener('pointerdown', follow, { signal, passive: true });
-    window.addEventListener('resize', () => { this.rect = null; }, { signal }); // orientation changes fire resize too
+    window.addEventListener('resize', () => { this.rect = null; this.water?.resize(); }, { signal }); // orientation changes fire resize too
+    this.water = Water.create(stage, this.el, { ...WATER[dest.id], ...variant?.water });
     // pointercancel / pointerleave: nothing is held, the fox simply keeps its current target.
   }
 
@@ -152,7 +157,9 @@ export class Runner {
 
   update(dt: number) {
     const sec = dt / 1000;
+    this.elapsedTotal += dt;
     if (!this.finished) this.elapsed += dt;
+    this.water?.render(this.elapsedTotal);
     const speed = this.finished ? this.speed * 0.6 : this.speed;
 
     // Parallax
@@ -285,5 +292,5 @@ export class Runner {
     this.entities.forEach((e) => e.el.classList.add('fade'));
   }
 
-  destroy() { this.el.remove(); this.entities = []; this.pool.clear(); }
+  destroy() { this.water?.destroy(); this.water = null; this.el.remove(); this.entities = []; this.pool.clear(); }
 }

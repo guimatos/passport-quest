@@ -74,6 +74,8 @@ await sleep(500);
 check((await state()) === 'playing', 'choosing a theme enters playing (second tap ignored)');
 check((await dbg()).chosen.brazil === 'food', 'chosen theme recorded (food)');
 check((await page.$$('.chip')).length === 3, 'HUD shows the 3 items of the chosen theme');
+check(await page.evaluate(() => window.passportQuest.debug.waterAlive), 'WebGL water active');
+check(await page.$eval('.water-rect', (e) => getComputedStyle(e).display === 'none'), 'SVG water rect hidden under the shader');
 await shot('02-brazil');
 
 // Real pointer: fox follows the mouse Y
@@ -182,6 +184,7 @@ for (let i = 0; i < 12; i++) {
   check(await page.$eval('#fx', (e) => e.childElementCount) === 0, `iteration ${i}: fx cleared`);
   check(await page.$eval('#scene-root', (e) => e.childElementCount) === 0, `iteration ${i}: scene cleared`);
   check(await page.evaluate(() => window.passportQuest.debug.particles === 0 && getComputedStyle(document.getElementById('stage')).transform === 'none' && document.getElementById('wipe').className === ''), `iteration ${i}: particles cleared, shake and wipe reset`);
+  check(await page.evaluate(() => !window.passportQuest.debug.waterAlive && document.getElementById('water') === null), `iteration ${i}: water torn down (no canvas, no context)`);
 }
 // prefers-reduced-motion: class applied on restart and followed live
 await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
@@ -217,6 +220,14 @@ const external = requests.filter((u) => !u.startsWith(new URL(url).origin));
 check(external.length === 0, `no external requests (${requests.length} local requests)`);
 check(errors.length === 0, `no console/page errors (${errors.length})`);
 if (errors.length) console.log(errors);
+
+// WebGL fallback: with ?nowebgl=1 the SVG gradient water shows and nothing errors
+await page.goto(url + '&nowebgl=1', { waitUntil: 'networkidle0' });
+await page.tap('.btn--play'); await sleep(350); await page.tap('.dest-btn[data-dest="brazil"]'); await sleep(1700); await page.tap('.theme-btn[data-theme="food"]'); await sleep(400);
+check((await state()) === 'playing', 'fallback run enters playing');
+check(!(await page.evaluate(() => window.passportQuest.debug.waterAlive)) && (await page.$('#water')) === null, 'no WebGL water with ?nowebgl=1');
+check(await page.$eval('.water-rect', (e) => getComputedStyle(e).display !== 'none'), 'SVG water rect visible in fallback');
+check(errors.length === 0, `no errors in the fallback run (${errors.length})`);
 
 console.log(`\nALL CHECKS PASSED at ${W}x${H}`);
 await browser.close();

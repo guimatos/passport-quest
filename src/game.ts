@@ -267,6 +267,7 @@ export class Game {
       onHit: (e, screen) => this.hit(e, screen),
     }, this.random, this.ac.signal, this.stage);
     this.sceneRoot.appendChild(this.runner.el);
+    if (this.runner.water) this.runner.water.static = this.reducedMotion();
 
     this.mountHud();
     this.hud.setDestination(dest, this.completedDests);
@@ -465,6 +466,7 @@ export class Game {
       perf: this.perf?.sample ?? null,
       pool: this.runner?.poolSize() ?? 0,
       particles: this.fx.activeParticles,
+      waterAlive: this.runner?.water?.alive ?? false,
       wiping: this.wiping,
       reducedMotion: this.reducedMotion(),
     };

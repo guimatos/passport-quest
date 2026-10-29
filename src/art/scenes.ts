@@ -22,7 +22,12 @@ export interface SceneVariant {
   backdrop?: string;
   /** Extra sky layer painted after the base layers (fireworks, string lights, cable car). */
   sky?: ParallaxLayer;
+  /** Water shader colour override (e.g. night sea). */
+  water?: Partial<WaterConfig>;
 }
+
+/** Water band per city (scene units), shader colours and which edge is the shore (foam, lighter water). */
+export interface WaterConfig { top: number; bottom: number; deep: string; light: string; foam: string; shore: 'top' | 'bottom' }
 
 export interface SceneArt {
   /** Page background color shown around the scene. */
@@ -182,6 +187,12 @@ const ribeiraHouse = (x: number, w: number, h: number, wall: string, roof: strin
     <rect x="${x + w / 2 - 7}" y="-27" width="14" height="14" fill="#F2C94C" opacity="0.6"/>`;
 };
 
+/** The SVG backdrop's `.water-rect` covers the same band as a fallback. Rio: beach below the sea; Porto: quay above the river. */
+export const WATER: Record<DestinationId, WaterConfig> = {
+  brazil: { top: 330, bottom: 400, deep: '#1E8FD0', light: '#5FD0F0', foam: '#FFF6E8', shore: 'bottom' },
+  portugal: { top: 612, bottom: 720, deep: '#1F4470', light: '#4C7FB8', foam: '#D9E6F2', shore: 'top' },
+};
+
 export const SCENE_ART: Record<DestinationId, SceneArt> = {
   brazil: {
     bg: '#5EC8F2',
@@ -192,10 +203,10 @@ export const SCENE_ART: Record<DestinationId, SceneArt> = {
         <linearGradient id="rio-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1E8FD0"/><stop offset="1" stop-color="#36B5E8"/></linearGradient>
         <linearGradient id="rio-sand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7E6B5"/><stop offset="1" stop-color="#EBCF8F"/></linearGradient>
       </defs>
-      <rect width="360" height="720" fill="url(#rio-sky)"/>
+      <rect width="360" height="330" fill="url(#rio-sky)"/>
       <circle cx="284" cy="128" r="42" fill="#FFE07A"/>
       <circle cx="284" cy="128" r="56" fill="#FFE07A" opacity="0.25"/>
-      <rect y="330" width="360" height="70" fill="url(#rio-sea)"/>
+      <rect class="water-rect" y="330" width="360" height="70" fill="url(#rio-sea)"/>
       <rect y="396" width="360" height="324" fill="url(#rio-sand)"/>
       <path d="M0 400 Q90 392 180 400 T360 400 L360 410 L0 410 Z" fill="#FFF6E8" opacity="0.8"/>
     `,
@@ -265,16 +276,17 @@ export const SCENE_ART: Record<DestinationId, SceneArt> = {
     variants: {
       party: {
         bg: '#2B1B5A',
+        water: { deep: '#152F5C', light: '#2E64A6', foam: '#C9D8F0' },
         backdrop: `
           <defs>
             <linearGradient id="rio-night" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1A1040"/><stop offset="0.55" stop-color="#4B2A8C"/><stop offset="1" stop-color="#8A4FA8"/></linearGradient>
             <linearGradient id="rio-nsea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B3F73"/><stop offset="1" stop-color="#2A5A96"/></linearGradient>
             <linearGradient id="rio-nsand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E0C48B"/><stop offset="1" stop-color="#C9A866"/></linearGradient>
           </defs>
-          <rect width="360" height="720" fill="url(#rio-night)"/>
+          <rect width="360" height="330" fill="url(#rio-night)"/>
           <g fill="#FFF6E8"><circle cx="40" cy="60" r="1.5"/><circle cx="120" cy="40" r="1"/><circle cx="200" cy="90" r="1.5"/><circle cx="330" cy="50" r="1"/><circle cx="260" cy="30" r="1.2"/><circle cx="80" cy="150" r="1"/><circle cx="180" cy="180" r="1.2"/><circle cx="320" cy="200" r="1"/></g>
           <circle cx="284" cy="120" r="30" fill="#FFF0C2"/><circle cx="296" cy="112" r="26" fill="#4B2A8C" opacity="0.9"/>
-          <rect y="330" width="360" height="70" fill="url(#rio-nsea)"/>
+          <rect class="water-rect" y="330" width="360" height="70" fill="url(#rio-nsea)"/>
           <rect y="396" width="360" height="324" fill="url(#rio-nsand)"/>
           <path d="M0 400 Q90 392 180 400 T360 400 L360 410 L0 410 Z" fill="#FFF6E8" opacity="0.6"/>`,
       },
@@ -301,10 +313,10 @@ export const SCENE_ART: Record<DestinationId, SceneArt> = {
         <linearGradient id="porto-river" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2F5C8E"/><stop offset="1" stop-color="#1F4470"/></linearGradient>
         <linearGradient id="porto-quay" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C9C2B4"/><stop offset="1" stop-color="#ADA698"/></linearGradient>
       </defs>
-      <rect width="360" height="720" fill="url(#porto-sky)"/>
+      <rect width="360" height="616" fill="url(#porto-sky)"/>
       <circle cx="70" cy="150" r="30" fill="#FFE8A8" opacity="0.9"/>
       <rect y="380" width="360" height="236" fill="url(#porto-quay)"/>
-      <rect y="612" width="360" height="108" fill="url(#porto-river)"/>
+      <rect class="water-rect" y="612" width="360" height="108" fill="url(#porto-river)"/>
     `,
     layers: [
       // Clouds + gulls
