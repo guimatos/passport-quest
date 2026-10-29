@@ -33,19 +33,29 @@ Time per section and the recording tool are left for the developer to fill in.
      was, no burst of spawned items, the hint fires ~4 s after resume, music
      resumes. Mention the frame-clamped clock and pause reasons.
 
-6. **Design decisions** (_time: …_)
+6. **Design decisions and performance** (_time: …_)
    - Runner instead of tap-to-find (reviewer request), theme choice per city,
      map hub, costumes and furniture layers, 360×720 scene with a safe band,
      one reset path, no dependencies.
+   - Stage 2 polish: point at the sea ripples (WebGL fragment shader under the
+     SVG; add `?nowebgl=1` to show the SVG fallback), catch an item for the
+     squash, sparkle burst and trail, hit an obstacle for the shake and flash,
+     and the wipe between screens.
+   - Open `?perf=1` and read the overlay; then show the table in
+     `docs/DEVELOPMENT_NOTE.md`: entity pooling and cached rects cut
+     main-thread busy time from ~49% to ~37% at 6x CPU throttle; the particle
+     canvas is free at DPR 1.5 (and was not at DPR 2); the water adds ~3
+     points in software GL.
 
 7. **The Scrambly connection** (_time: …_)
    - Discover (theme + items) → Play & progress (demo points, passport bar) →
      Redeem (stamp, demo coupon, wallet). Fox as guide. Demo labelling.
 
 8. **Testing** (_time: …_)
-   - Show `node scripts/e2e.mjs` and `layoutcheck.mjs` runs on the static
-     `dist/` server; the emulated-vs-real table in the README; ZIP size check
-     from `npm run package`.
+   - Run `npm run check`: typecheck, build, bundle budget, e2e at both sizes
+     on a static preview of `dist/`, layout checks, perf print; the same job is
+     in `.github/workflows/check.yml`. Show the emulated-vs-real table in the
+     README and the ZIP size check from `npm run package`.
 
 9. **Limitations** (_time: …_)
    - Emulated testing only, music unauditioned, keyboard on the final screen,

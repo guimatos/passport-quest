@@ -1,4 +1,4 @@
-# Development note — Passport Quest (Stage 1)
+# Development note — Passport Quest (Stage 1 and Stage 2 polish)
 
 ## Tools and libraries
 
@@ -10,10 +10,12 @@
 | `puppeteer-core` | headless-Chrome test scripts, uses the installed Google Chrome | no (dev-only) |
 | Python 3 `http.server` | static-server test of `dist/` | no |
 | Web Audio API | procedural background music | browser API |
+| WebGL 1 | water shader (`src/scene/water.ts`), SVG fallback | browser API |
+| Canvas 2D | pooled particles (`src/fx/particles.ts`) | browser API |
 
 No game framework and no runtime npm dependency. Runtime assets are the bundled
 JS, CSS and the four font files; there are no images, audio files or external
-URLs. The production build is about 224 KB on disk.
+URLs. The production build is about 233 KB on disk (`npm run check` enforces a 300,000-byte budget).
 
 ## Assets
 
@@ -98,6 +100,58 @@ the median of three to five runs. `?perf=1` shows the live overlay in any build.
 | + canvas particles (sparkles, trails, dust, confetti), squash, shake, flash, wipe | 60 | 22 | 0.44 | 38.8 | 5822 | 1075 | 282 | 875 | 3 |
 | + WebGL water shader (band-sized canvas, 30 fps redraw) | 60 | 22 | 0.51 | 41.8 | 6266 | 1191 | 261 | 878 | 3 |
 
+Reading the table: the SVG scene is style/layout bound, not script bound.
+Pooling removed the node churn (script time −40%, main-thread busy −12
+points). The particle canvas is free as long as its backing store is small:
+at device-pixel-ratio 2 the raster area alone cost about 7 points, at 1.5 it
+costs nothing measurable. The WebGL water adds about 3 points in headless
+Chrome, which renders GL in software (SwiftShader) and so is an upper bound;
+a phone GPU runs the same fragment shader in hardware.
+
+## Technical problems and solutions
+
+1. **CSS animations silently cancelled SVG `transform` attributes.** Palm
+   crowns and clouds jumped between their placed position and the origin.
+   Cause: a CSS `transform` animation replaces the presentation attribute, and
+   mismatched transform lists interpolate through matrices. Diagnosed by
+   comparing two screenshots of the same layer; fixed by wrapping every
+   animated element in a plain positioning `<g>`.
+2. **Pausing without time jumps.** `setTimeout` timers kept running while
+   hidden and all fired on return. Replaced with a frame-driven clock (timers
+   and tweens keyed to game time) and a loop with named pause reasons and a
+   clamped delta. The Stage 2 shake, wipe, particles and water all take their
+   time from that clock, so they freeze and resume with everything else.
+3. **One coordinate system for every phone.** A 360×720 viewBox with `slice`
+   fit and a computed safe band keeps hit areas, HUD and items identical on
+   320×568 and 390×844; the WebGL shader reuses the same fit as uniforms, so
+   the ripples line up with the SVG shore on any viewport.
+4. **Music without assets.** A lookahead scheduler over the AudioContext clock
+   plays three loops from oscillators and filtered noise; it is unlocked on a
+   gesture, muted from the HUD and suspended while hidden.
+5. **Effects without DOM churn.** Sparkles and confetti were DOM nodes created
+   and removed per burst, and every item/obstacle was a fresh `<g>` per spawn.
+   Entity nodes are now pooled per kind and id, and effects are a fixed
+   400-particle pool on one canvas with dirty-rect clearing. The first canvas
+   version measured *slower*: at DPR 2 the full-stage clear each frame cost
+   more than the DOM it replaced. Capping the canvas at DPR 1.5 removed the
+   cost (table above).
+6. **Layout thrash from `getBoundingClientRect`.** The scene rect was read on
+   every pointer move and every effect, and the plane tween read the map rect
+   every frame. Rects are now cached and invalidated on `resize`; the only
+   forced layout left is the deliberate one that restarts Capi's squash.
+7. **WebGL contexts and restart.** A canvas keeps its (lost) context after
+   `WEBGL_lose_context`, so reusing one `#water` canvas across levels gave the
+   second level a dead context. Each level now creates its own canvas, and
+   `destroy()` loses the context and removes the element; the restart loop
+   asserts that no canvas and no live context remain. Context loss at runtime
+   falls back to the SVG gradient without an error.
+8. **Measuring something that is vsync-bound.** At 6x CPU throttle the game
+   still holds 60 fps in headless Chrome, so fps could not show improvements.
+   `scripts/perfcheck.mjs` reads the renderer's cumulative task, style and
+   layout durations through the DevTools `Performance` domain instead and
+   reports main-thread busy time; run-to-run noise on a laptop is about ±5
+   points, so rows are medians.
+
 ## AI correction / rejected output — written by developer
 
 _To be filled in by the developer._
@@ -105,6 +159,11 @@ _To be filled in by the developer._
 ## Known limitations and unfinished work
 
 - Not tested on real devices; all results are emulated headless Chrome.
+- Headless Chrome renders WebGL with SwiftShader (software), so the water's
+  measured cost is an upper bound and its look on a phone GPU is unverified;
+  `?nowebgl=1` shows the SVG fallback for comparison.
+- `prefers-reduced-motion` is honoured (no shake, still water, ambient
+  decoration stopped, fewer particles) but was verified only through emulation.
 - Music has not been auditioned on a device; patterns may need taste tuning.
 - Mobile keyboard on the final screen may shorten the viewport; the layout is
   compact but was not verified with a real on-screen keyboard.

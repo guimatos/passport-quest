@@ -147,6 +147,11 @@ and the measurement method are in `docs/DEVELOPMENT_NOTE.md`.
   roughly 30–45 s run per city but was validated with an autopilot, not humans.
 - Rotate prompt threshold: landscape viewports under 480 px tall show the
   prompt; taller landscape windows (desktop) get a centered phone frame.
+- The WebGL water was verified in headless Chrome, which renders GL in
+  software (SwiftShader): its measured cost is an upper bound and its look on
+  a phone GPU is unverified. `?nowebgl=1` forces the SVG fallback. Performance
+  numbers (`docs/DEVELOPMENT_NOTE.md`) come from a laptop at 6x CPU throttle
+  and vary by about ±5 points of main-thread time between runs.
 
 ## Project structure
 
@@ -155,15 +160,19 @@ index.html              app shell
 src/main.ts             boot
 src/game.ts             state machine (start, intro/map, playing, redeem, journal, final), reset()
 src/data/destinations.ts  destinations, themes, items, coupons, obstacles, tuning (content contract)
-src/scene/runner.ts     parallax runner scene, pointer follow, spawns, collisions
+src/scene/runner.ts     parallax runner scene, pointer follow, pooled spawns, collisions
+src/scene/water.ts      WebGL water shader under the scene (SVG gradient fallback)
 src/ui/hud.ts           HUD: restart, mute, wallet, progress bar, item chips, fox guide bubble
 src/ui/screens.ts       start, map/intro, redeem, journal, final (email mock, CTA)
 src/art/*.ts            SVG art: scenes, items, capy, fox, map, passport
-src/fx/fx.ts            sparkles, fly-to-HUD, floating text, confetti
+src/fx/fx.ts            effects: canvas particles (bursts, trails, dust, confetti), fly-to-HUD, floating text
+src/fx/particles.ts     fixed-size particle pool on a 2D canvas
+src/lib/perf.ts         ?perf=1 overlay (fps, frame time, JS per frame, node count)
 src/audio/music.ts      procedural music (Web Audio), mute, hidden handling
 src/lib/*.ts            game clock (timers/tweens), rAF loop with pause reasons, DOM helpers, seeded RNG
 src/styles.css          all styling and CSS animations
-scripts/                package, e2e, layoutcheck, playshot, artcheck
+scripts/                check (all gates), package, e2e, layoutcheck, perfcheck, playshot, artcheck
+.github/workflows/      check.yml: the same gates on every push once a remote exists
 docs/                   development note, walkthrough outline
 .claude/change-loop.md  change-loop profile for /plan-change and /implement-change
 plans/                  plans written by /plan-change
