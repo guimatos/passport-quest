@@ -12,7 +12,10 @@ const shots = process.env.SHOTS ?? '';
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: chromeArgs('--no-first-run') });
 const page = await browser.newPage();
-await page.setViewport({ width: W, height: H, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+// CI runners draw WebGL in software; at DPR 2 the 390x844 canvas runs under 20 fps there and the frame clock
+// (50 ms clamp) falls behind the wall-clock sleeps below. DPR 1 keeps the same CSS viewport with a third of the pixels.
+const DPR = process.env.CI ? 1 : 2;
+await page.setViewport({ width: W, height: H, deviceScaleFactor: DPR, isMobile: true, hasTouch: true });
 const errors = [], logs = [], requests = [];
 page.on('console', (m) => { logs.push(`${m.type()}: ${m.text()}`); if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e)));
@@ -57,8 +60,7 @@ await page.tap('.theme-btn[data-theme="party"]').catch(() => {});
 await sleep(500);
 check((await state()) === 'playing', 'choosing a theme enters playing (second tap ignored)');
 check(await hintVisible(), 'ghost hand shown at level start');
-await sleep(1700);
-check(!(await hintVisible()) || (await dbg()).progress > 0, 'ghost hand hides after ~1.6 s');
+check(await until(async () => !(await hintVisible()) || (await dbg()).progress > 0, 4000) !== null, 'ghost hand hides after ~1.6 s (polled, slow renderers allowed up to 4 s)');
 check((await dbg()).chosen.brazil === 'food', 'chosen theme recorded (food)');
 check((await page.$$('.chip')).length === 3, 'HUD shows the 3 items of the chosen theme');
 check(await page.$eval('.hud-toast', (e) => getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)'), 'toast has a solid backing');
