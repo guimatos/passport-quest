@@ -8,6 +8,10 @@ Time per section and the recording tool are left for the developer to fill in.
      costume preview and the coupon line.
    - Run: move up and down; catch two items; show the chips, the +10, the bar.
      Hit an obstacle on purpose: "Ouch!", bar loses one segment, no game over.
+   - Tap to dash through a crab: "Dodged!", +5. Catch five in a row: the x2
+     badge on the wallet and "Combo x2!"; a hit floats "Combo lost!".
+   - A golden coconut glows: freeze-frame on the catch, +30, counts double for
+     the coupon.
    - Call out the "Faster!" toast when the ramp passes halfway.
 
 2. **Progression and ending** (_time: …_)
@@ -17,7 +21,7 @@ Time per section and the recording tool are left for the developer to fill in.
    - Map shows Rio stamped; Porto auto-selected; pick a different theme to
      show the environment change (night São João or café terrace).
    - Final screen: passport with both stamps and themes, demo points,
-     coupons list.
+     coupons list, "New best!" (stored locally, demo).
 
 3. **CTA** (_time: …_)
    - Tap "Explore Scrambly": local confirmation text, console log, URL

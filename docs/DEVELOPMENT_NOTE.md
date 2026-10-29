@@ -156,6 +156,50 @@ a phone GPU runs the same fragment shader in hardware.
 
 _To be filled in by the developer._
 
+## Gameplay feel (Stage 2b)
+
+Tuning lives in `FEEL` (`src/data/destinations.ts`); `level` values are
+unchanged from Stage 1, so the difficulty curve is the same and only the
+feedback around it changed.
+
+| Mechanic | Value | Why |
+|---|---|---|
+| Combo multiplier | +1 every 5 catches, cap x4; reset on a hit ("Combo lost!") | Gives obstacles a cost beyond one progress point, still without a fail state |
+| Dash | 350 ms immunity, 1.1 s cooldown; quick tap, Space or ArrowRight | A second decision for the player; near misses become dodges (+5, combo kept) |
+| Spawn patterns | single 50 %, row 20 %, arc 15 %, zigzag 15 %; every y clamped to the band | Readable routes instead of single random heights |
+| Golden signature item | 12 % of signature spawns; x3 points, counts 2 for the coupon | Makes the coupon a visible target, not a side effect of the spawn weight |
+| Hit-stop | 45 ms on a hit, 90 ms on a golden or coupon catch | The cheapest "weight" an impact can have: `Game.frame` skips the clock and runner |
+| Capi scale and lean | 0.72 (was 0.6), lean up to 14° toward the direction of travel | The hero should outweigh the collectibles; the lean sells the lane change |
+| Depth cues | ground shadow per entity (outside the bob group), band shade, horizon haze | The flat ground read as empty; shadows make scale read as distance |
+| Toasts | dark pill behind the text | "Coupon unlocked!" was unreadable over the Porto facades |
+
+Playtest note: tuned with the e2e autopilot plus manual runs per city at
+390×844 in Chrome touch emulation. Both cities still complete in 40–60 s; the
+coupon still unlocks on most runs, the golden item mostly changes how it
+feels. The Rio autopilot reaches x4 before the bar fills, so a human who
+dodges will see the badge move. Real-device playtests are still pending (see
+Known limitations).
+
+Performance (same-session A/B, alternating runs of `scripts/perfcheck.mjs`,
+15 s, 6x throttle, three rounds): polish build 60.1 % main-thread busy, worst
+frame 35 ms, 875 nodes; feel build 62.0 %, 28 ms, 890 nodes. The 2-point
+difference is inside the documented run-to-run noise. The absolute busy
+numbers differ from the table above because the machine state differs between
+days; compare rows only within one session. The golden glow is a CSS
+`filter` on at most a couple of nodes at a time; the lane lean is one
+attribute write per frame on a group that already carries `will-change`.
+
+Storage: mute and best score use `localStorage` through `src/lib/storage.ts`;
+every access is wrapped, so a sandboxed iframe or private window plays
+exactly like before (`NO_STORAGE=1 node scripts/e2e.mjs` proves it). No data
+leaves the device.
+
+Keyboard: ArrowUp/ArrowDown move, Space/ArrowRight dash. This closes the Stage
+1 gap of the runner having no keyboard alternative.
+
+Onboarding: the move hint shows for 1.6 s at level start (ghost hand) before
+the 4 s idle hint takes over; the first fox line says "Tap to dash!".
+
 ## Known limitations and unfinished work
 
 - Not tested on real devices; all results are emulated headless Chrome.
@@ -170,5 +214,9 @@ _To be filled in by the developer._
 - Difficulty tuned with an autopilot; human playtest data would refine
   `level` values and the coupon threshold (6 of the signature item).
 - The fox guide's speech bubble is text-only; no localisation.
-- Accessibility: buttons have labels and the HUD uses `aria-live`, but the
-  runner itself needs pointer control and has no keyboard alternative.
+- Accessibility: buttons have labels and the HUD uses `aria-live`; the runner
+  takes keyboard input (arrows, Space) but has no screen-reader description
+  of what is on screen.
+- Combo, dash, golden and hit-stop values (`FEEL`) were tuned with the
+  autopilot and emulated touch, not with players; the golden chance and the
+  dash cooldown are the two numbers most likely to move after a playtest.

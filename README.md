@@ -68,6 +68,8 @@ Add `?seed=N` to the URL for deterministic spawns (the tests use `seed=7`),
 water fallback. `window.passportQuest.debug` exposes read-only state for the
 scripts. The scripts use the Google Chrome found at the macOS path by default;
 set `CHROME_PATH` to point them at another Chrome or Chromium binary.
+`NO_STORAGE=1 node scripts/e2e.mjs …` runs the flow with `localStorage`
+throwing on every access (sandboxed-iframe conditions).
 
 ## How to play (reviewer notes)
 
@@ -147,6 +149,10 @@ and the measurement method are in `docs/DEVELOPMENT_NOTE.md`.
   roughly 30–45 s run per city but was validated with an autopilot, not humans.
 - Rotate prompt threshold: landscape viewports under 480 px tall show the
   prompt; taller landscape windows (desktop) get a centered phone frame.
+- Keyboard: arrows move Capi, Space or ArrowRight dashes. Screen readers get
+  the HUD live regions only; the run itself is visual.
+- Best score and mute are kept in `localStorage` when the browser allows it;
+  inside a sandboxed iframe or a private window they simply reset each load.
 - The WebGL water was verified in headless Chrome, which renders GL in
   software (SwiftShader): its measured cost is an upper bound and its look on
   a phone GPU is unverified. `?nowebgl=1` forces the SVG fallback. Performance
@@ -159,8 +165,8 @@ and the measurement method are in `docs/DEVELOPMENT_NOTE.md`.
 index.html              app shell
 src/main.ts             boot
 src/game.ts             state machine (start, intro/map, playing, redeem, journal, final), reset()
-src/data/destinations.ts  destinations, themes, items, coupons, obstacles, tuning (content contract)
-src/scene/runner.ts     parallax runner scene, pointer follow, pooled spawns, collisions
+src/data/destinations.ts  destinations, themes, items, coupons, obstacles, level tuning and FEEL (combo, dash, golden, hit-stop) (content contract)
+src/scene/runner.ts     parallax runner scene, pointer/keyboard control, dash, spawn patterns, pooled spawns, collisions
 src/scene/water.ts      WebGL water shader under the scene (SVG gradient fallback)
 src/ui/hud.ts           HUD: restart, mute, wallet, progress bar, item chips, fox guide bubble
 src/ui/screens.ts       start, map/intro, redeem, journal, final (email mock, CTA)
@@ -168,6 +174,7 @@ src/art/*.ts            SVG art: scenes, items, capy, fox, map, passport
 src/fx/fx.ts            effects: canvas particles (bursts, trails, dust, confetti), fly-to-HUD, floating text
 src/fx/particles.ts     fixed-size particle pool on a 2D canvas
 src/lib/perf.ts         ?perf=1 overlay (fps, frame time, JS per frame, node count)
+src/lib/storage.ts      guarded localStorage for mute and best score (no network; silent when blocked)
 src/audio/music.ts      procedural music (Web Audio), mute, hidden handling
 src/lib/*.ts            game clock (timers/tweens), rAF loop with pause reasons, DOM helpers, seeded RNG
 src/styles.css          all styling and CSS animations
