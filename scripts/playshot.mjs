@@ -1,10 +1,10 @@
 // Dev-only: captures mid-play frames for visual review. Usage: node scripts/playshot.mjs <outdir> [w] [h]
 import puppeteer from 'puppeteer-core';
-import { withMode, installAutopilot } from './autopilot.mjs';
+import { withMode, installAutopilot, chromeArgs } from './autopilot.mjs';
 const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const out = process.argv[2]; const W = Number(process.argv[3] ?? 320), H = Number(process.argv[4] ?? 568);
 const RIO = process.argv[5] ?? 'party', PORTO = process.argv[6] ?? 'party';
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: chromeArgs() });
 const page = await browser.newPage();
 await page.setViewport({ width: W, height: H, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 await page.goto(withMode('http://localhost:5173/?seed=11'), { waitUntil: 'networkidle0' });

@@ -3,6 +3,17 @@
 export const MODE = process.env.MODE === '2d' ? '2d' : '3d';
 export const withMode = (url) => (MODE === '2d' ? url + (url.includes('?') ? '&' : '?') + 'mode=2d' : url);
 
+// Chrome launch flags shared by the gate scripts. Headless Chrome on a machine without a GPU (GitHub's
+// runners) only exposes WebGL through SwiftShader, which Chrome 136+ refuses unless it is asked for
+// explicitly; without it the 3D runner silently falls back to 2D and the e2e fails on "runner mode is 3d".
+// On a Mac with a GPU the flags change nothing.
+export const chromeArgs = (...extra) => [
+  '--enable-unsafe-swiftshader',
+  '--ignore-gpu-blocklist',
+  ...(process.env.CI ? ['--use-angle=swiftshader'] : []),
+  ...extra,
+];
+
 /**
  * Installs window.__autopilot(ms, target = 'item', dashThrough = false): steers toward the nearest
  * entity of `target` kind until ms elapse or the level ends. In 2D the control axis is the pointer Y

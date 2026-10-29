@@ -1,9 +1,9 @@
 // Dev-only: landscape rotate prompt, desktop frame, and mid-game resize/orientation checks.
 import puppeteer from 'puppeteer-core';
-import { MODE, withMode } from './autopilot.mjs';
+import { MODE, withMode, chromeArgs } from './autopilot.mjs';
 const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const url = withMode((process.argv[2] ?? 'http://localhost:4173/') + '?seed=5');
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: chromeArgs() });
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));

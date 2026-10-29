@@ -1,12 +1,12 @@
 // Dev-only: measures fps/frame time/node count at 6x CPU throttle during the busiest scene (Rio Party at night).
 // Usage: node scripts/perfcheck.mjs [url] [seconds]
 import puppeteer from 'puppeteer-core';
-import { MODE, withMode, installAutopilot } from './autopilot.mjs';
+import { MODE, withMode, installAutopilot, chromeArgs } from './autopilot.mjs';
 const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const base = process.argv[2] ?? 'http://localhost:5173/';
 const url = withMode(base + (base.includes('?') ? '&' : '?') + 'seed=7&perf=1');
 const seconds = Number(process.argv[3] ?? 15);
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--enable-precise-memory-info'] });
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: chromeArgs('--enable-precise-memory-info') });
 const page = await browser.newPage();
 await page.setViewport({ width: 320, height: 568, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

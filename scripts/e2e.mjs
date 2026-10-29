@@ -2,7 +2,7 @@
 // Usage: node scripts/e2e.mjs [url] [width] [height]
 // Steers the fox with an in-page autopilot that dispatches real PointerEvents.
 import puppeteer from 'puppeteer-core';
-import { MODE, withMode, installAutopilot } from './autopilot.mjs';
+import { MODE, withMode, installAutopilot, chromeArgs } from './autopilot.mjs';
 
 const base = process.argv[2] ?? 'http://localhost:5173/';
 const url = withMode(base + (base.includes('?') ? '&' : '?') + 'seed=7');
@@ -10,7 +10,7 @@ const W = Number(process.argv[3] ?? 320), H = Number(process.argv[4] ?? 568);
 const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const shots = process.env.SHOTS ?? '';
 
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-first-run'] });
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: chromeArgs('--no-first-run') });
 const page = await browser.newPage();
 await page.setViewport({ width: W, height: H, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const errors = [], logs = [], requests = [];
