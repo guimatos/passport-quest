@@ -41,6 +41,17 @@ const until = async (fn, maxMs) => { const t = Date.now(); while (Date.now() - t
 /** The intro card slides in on the game clock (500 ms); on a slow renderer it is still moving when a fixed
  *  sleep ends and a tap computed on the moving card lands beside the button. Wait for it to settle first. */
 const cardSettled = () => until(() => page.$eval('.intro-card', (e) => e.classList.contains('show') && e.style.opacity === '1' && e.style.transform === 'translateY(0px)'), 4000);
+/** Taps Continue once the button exists and the screen wipe has released input, then waits for the target state;
+ *  fixed sleeps ran ahead of the game-clock wipe on slow CI runners ("final screen" failed there). */
+const continueTo = async (expected) => {
+  check((await until(() => page.evaluate(() => !!document.querySelector('.btn--continue') && !window.passportQuest.debug.wiping), 4000)) !== null, `continue button ready before ${expected}`);
+  // The screens slide in; a tap computed on a moving button misses. Wait until its rect stops changing.
+  const rect = () => page.$eval('.btn--continue', (e) => { const r = e.getBoundingClientRect(); return `${r.x.toFixed(1)},${r.y.toFixed(1)},${getComputedStyle(e).opacity}`; });
+  let last = await rect();
+  await until(async () => { await sleep(100); const now = await rect(); const same = now === last; last = now; return same; }, 4000);
+  await page.tap('.btn--continue');
+  check((await until(async () => (await state()) === expected, 4000)) !== null, `continue enters ${expected}`);
+};
 const tapTheme = async (id) => { check((await cardSettled()) !== null, `intro card settled before choosing ${id}`); await page.tap(`.theme-btn[data-theme="${id}"]`); };
 
 await installAutopilot(page);
@@ -160,16 +171,14 @@ check(r1.progress === 16, 'progress capped at goal (16)');
 check(r1.points >= 16 * 10 + 100, `points include multiplier gains and the completion bonus (${r1.points})`);
 check((await page.$('.btn--continue')) !== null, 'redeem card visible');
 check((await page.evaluate(() => window.passportQuest.debug.pool)) > 0, 'entity nodes are pooled and reused');
+await until(() => page.evaluate(() => !window.passportQuest.debug.wiping), 4000);
 await page.tap('.btn--continue');
 await page.tap('.btn--continue').catch(() => {});
-await sleep(200);
-check((await state()) === 'journal', 'continue enters journal (double tap ignored)');
+check((await until(async () => (await state()) === 'journal', 4000)) !== null, 'continue enters journal (double tap ignored)');
 await shot('04b-journal');
 check((await page.$$('.journal-row')).length === 3, 'journal lists the 3 themed items');
 check((await dbg()).entities.every((e) => e.kind === 'obstacle' || ['coconut', 'acai', 'brigadeiro'].includes(e.id)), 'only food-theme items spawned in Rio');
-await page.tap('.btn--continue');
-await sleep(500);
-check((await state()) === 'intro', 'journal continue returns to the map');
+await continueTo('intro'); console.log('ok   journal continue returns to the map');
 await sleep(3400); await shot('05-intro-porto');
 check(await page.$$eval('.map-marker--done', (els) => els.length) === 1, 'map shows Rio as done');
 check(await page.$eval('.intro-card h2', (e) => e.textContent.startsWith('Porto')), 'remaining destination auto-selected (Porto)');
@@ -182,9 +191,8 @@ const t1 = Date.now();
 await autopilot(90000, 'item');
 check((await state()) !== 'playing', `Portugal completed via autopilot in ${((Date.now() - t1) / 1000).toFixed(1)}s`);
 await sleep(1500);
-await page.tap('.btn--continue'); await sleep(200);
-await page.tap('.btn--continue'); await sleep(500);
-check((await state()) === 'final', 'final screen');
+await continueTo('journal');
+await continueTo('final'); console.log('ok   final screen');
 await shot('07-final');
 const finalPts = await page.$eval('.final-wallet strong', (e) => Number(e.textContent));
 check(finalPts >= 34 * 10 + 200, `final total shown (${finalPts})`);
@@ -227,9 +235,9 @@ for (let i = 0; i < 12; i++) {
   await sleep(1750); await page.tap(`.theme-btn[data-theme="${['food', 'party', 'culture'][i % 3]}"]`); await sleep(400);
   if (i % 3 === 1) {
     await autopilot(90000, 'item'); await sleep(1200);
-    await page.tap('.btn--continue'); await sleep(300);
+    await continueTo('journal');
     if (i % 2 === 0) {
-      await page.tap('.btn--continue'); await sleep(500);
+      await continueTo('intro');
       check((await state()) === 'intro', `iteration ${i}: in intro`);
     } else {
       check((await state()) === 'journal', `iteration ${i}: in journal`);
