@@ -50,7 +50,16 @@ const continueTo = async (expected) => {
   let last = await rect();
   await until(async () => { await sleep(100); const now = await rect(); const same = now === last; last = now; return same; }, 4000);
   await page.tap('.btn--continue');
-  check((await until(async () => (await state()) === expected, 4000)) !== null, `continue enters ${expected}`);
+  if ((await until(async () => (await state()) === expected, 4000)) === null) {
+    // Diagnostics for a miss (seen only on the CI runner): what is under the button and what the game thinks.
+    const diag = await page.evaluate(() => {
+      const d = window.passportQuest.debug; const b = document.querySelector('.btn--continue'); const r = b?.getBoundingClientRect();
+      const under = r ? document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) : null;
+      return { state: d.state, wiping: d.wiping, rect: r && [r.x, r.y, r.width, r.height].map(Math.round), under: under && (under.tagName + '.' + under.className), visible: b && getComputedStyle(b).visibility, viewport: [innerWidth, innerHeight] };
+    });
+    console.log('continueTo diagnostics:', JSON.stringify(diag), '| last logs:', logs.slice(-4).join(' || '));
+    check(false, `continue enters ${expected}`);
+  }
 };
 const tapTheme = async (id) => { check((await cardSettled()) !== null, `intro card settled before choosing ${id}`); await page.tap(`.theme-btn[data-theme="${id}"]`); };
 
