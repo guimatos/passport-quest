@@ -41,6 +41,16 @@ const until = async (fn, maxMs) => { const t = Date.now(); while (Date.now() - t
 /** The intro card slides in on the game clock (500 ms); on a slow renderer it is still moving when a fixed
  *  sleep ends and a tap computed on the moving card lands beside the button. Wait for it to settle first. */
 const cardSettled = () => until(() => page.$eval('.intro-card', (e) => e.classList.contains('show') && e.style.opacity === '1' && e.style.transform === 'translateY(0px)'), 4000);
+/** Taps `selector`, waits up to 1.5 s for `cond`, and retaps (at most `tries` times) if nothing happened. On the CI
+ *  runner software GL starves the main thread and Chrome occasionally synthesises no click from a touch tap (the
+ *  diagnostics showed the tap landing on the visible button with zero click events); a player would tap again. */
+const tapUntil = async (selector, cond, tries = 3) => {
+  for (let i = 0; i < tries; i++) {
+    await page.tap(selector).catch(() => {});
+    if ((await until(cond, 1500)) !== null) { if (i) console.log(`note: ${selector} needed ${i + 1} taps`); return true; }
+  }
+  return false;
+};
 /** Taps Continue once the button exists and the screen wipe has released input, then waits for the target state;
  *  fixed sleeps ran ahead of the game-clock wipe on slow CI runners ("final screen" failed there). */
 const continueTo = async (expected) => {
@@ -50,8 +60,7 @@ const continueTo = async (expected) => {
   let last = await rect();
   await until(async () => { await sleep(100); const now = await rect(); const same = now === last; last = now; return same; }, 4000);
   const before = await page.evaluate(() => { const b = document.querySelector('.btn--continue'); window.__contClicks = 0; b.addEventListener('click', () => { window.__contClicks++; }, { once: true }); return { time: window.passportQuest.debug.time, paused: window.passportQuest.debug.paused }; });
-  await page.tap('.btn--continue');
-  if ((await until(async () => (await state()) === expected, 4000)) === null) {
+  if (!(await tapUntil('.btn--continue', async () => (await state()) === expected))) {
     // Diagnostics for a miss (seen only on the CI runner): what is under the button and what the game thinks.
     const diag = await page.evaluate(() => {
       const d = window.passportQuest.debug; const b = document.querySelector('.btn--continue'); const r = b?.getBoundingClientRect();
@@ -62,7 +71,7 @@ const continueTo = async (expected) => {
     check(false, `continue enters ${expected}`);
   }
 };
-const tapTheme = async (id) => { check((await cardSettled()) !== null, `intro card settled before choosing ${id}`); await page.tap(`.theme-btn[data-theme="${id}"]`); };
+const tapTheme = async (id) => { check((await cardSettled()) !== null, `intro card settled before choosing ${id}`); check(await tapUntil(`.theme-btn[data-theme="${id}"]`, async () => (await state()) === 'playing'), `theme ${id} tap enters playing`); };
 
 await installAutopilot(page);
 const autopilot = (ms, target, dash) => page.evaluate((ms, t, dsh) => window.__autopilot(ms, t, dsh), ms, target, dash);
