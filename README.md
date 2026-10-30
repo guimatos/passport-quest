@@ -16,6 +16,10 @@ redeem, with every balance and coupon clearly labelled as demo.
 No backend, no analytics, no external requests at runtime. Everything (code,
 fonts, art, music) is bundled or generated in the browser.
 
+**Live demo:** https://passport-quest-five.vercel.app/ (production deploy of
+`main` on Vercel; add `?mode=2d` for the 2D runner). Open it in a phone-sized
+window or on a phone.
+
 ## Versions
 
 | Stage | What | Where |
@@ -108,6 +112,7 @@ the model gallery page and the CI workflow under `source/`.
 | `npm run preview` | Vite preview of `dist/` |
 | `npm run serve:dist` | Python static server for `dist/` on 4173 |
 | `npm run package` | Build and create the delivery ZIP with verification |
+| `npx vercel deploy --prod` | Deploys `dist/` to the linked Vercel project (`vercel.json` runs the full `npm run build`, single-file step included) |
 | `npm run check` | Every gate in one run: typecheck, build, bundle budget (≤ 300,000 bytes), e2e at both sizes in 3D plus once in 2D against a static preview of `dist/`, layout checks, e2e once with `dist/index.html` opened as a file, perf print |
 | `npm run perf` | `scripts/perfcheck.mjs`: fps, frame times, main-thread cost and heap at 6x CPU throttle in the busiest scene (prints JSON) |
 | `node scripts/e2e.mjs <url> <w> <h>` | Headless-Chrome flow test (uses the installed Google Chrome via `puppeteer-core`, dev-only) |
