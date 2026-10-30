@@ -329,6 +329,16 @@ but it has not been measured on one.
    sequences are escaped, and the CSS is inlined with the woff2 fonts as
    data URIs. `npm run check` runs the e2e once against the file URL; the
    only "requests" are the two data-URI fonts.
+8. **Dropped taps on the CI runner.** On GitHub's runners (no GPU, WebGL
+   through SwiftShader) the 3D e2e failed now and then at a Continue or
+   theme tap. Diagnostics added to the script showed the tap landing on the
+   visible button, the game clock running and the loop not paused, but zero
+   click events: with the main thread starved by software rendering, Chrome
+   sometimes synthesises no click from a touch tap. Locally, even with
+   SwiftShader forced, it never happened. The e2e now retaps once when a tap
+   produces no state change (up to three tries, logged), and the same run
+   is green on CI, logging a second tap on about one Continue per run. The
+   2D run never needs one, which matches the cause.
 
 ## Known limitations and unfinished work
 
