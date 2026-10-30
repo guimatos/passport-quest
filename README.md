@@ -4,13 +4,13 @@ A mobile-first HTML5 playable for Scrambly (Simula take-home, Stage 1; Stage 2
 polish and feel; Stage 3 adds a 3D version of the run).
 
 Capi the capybara runs through Rio de Janeiro and Porto, guided by the Scrambly
-fox. Since Stage 3 the run is a low-poly 3D world drawn with hand-written WebGL
-(camera behind Capi, Copacabana and the Ribeira quay streaming toward the
-player); the original SVG parallax runner stays as the fallback when WebGL is
-unavailable or with `?mode=2d`. Before each city the player picks what to see (Eat & drink, Party or
-Culture); the run streams that theme's items, each catch adds **demo points**,
-and finishing a city **redeems** a passport stamp plus, if enough of the
-signature item was caught, a **demo coupon**. Discover → play & progress →
+fox. The run comes in two modes (see [Game modes](#game-modes-3d-and-2d)): a
+low-poly 3D world drawn with hand-written WebGL, which is the default, and the
+original 2D SVG parallax runner, which is the fallback and can be forced with
+`?mode=2d`. Before each city the player picks what to see (Eat & drink, Party
+or Culture); the run streams that theme's items, each catch adds **demo
+points**, and finishing a city **redeems** a passport stamp plus, if enough of
+the signature item was caught, a **demo coupon**. Discover → play & progress →
 redeem, with every balance and coupon clearly labelled as demo.
 
 No backend, no analytics, no external requests at runtime. Everything (code,
@@ -27,6 +27,32 @@ fonts, art, music) is bundled or generated in the browser.
 `main` holds everything. The `stage2/polish-perf` and `stage3/3d-runner`
 branches are merged and kept only as history. Stages 2 and 3 have no tag yet;
 `npm run check` is green at the merge commit.
+
+## Game modes: 3D and 2D
+
+Both modes are the same game: the same map, theme cards, HUD, redeem and
+journal screens, data, spawn timing, dash window, combo, golden items,
+hit-stop and difficulty ramp. Only the run itself is rendered and steered
+differently. The game picks the mode on each level start.
+
+| | 3D (default) | 2D (fallback) |
+|---|---|---|
+| When | WebGL is available and no override is set | No WebGL context, `?mode=2d`, or `?nowebgl=1` |
+| Rendering | Hand-written WebGL 1 (`src/gl/`, `src/scene3d/`): one lit-and-fog shader, low-poly models built from primitives with vertex colours, about 25 draw calls a frame | Inline SVG parallax scene (`src/scene/runner.ts`) with pooled entity nodes, plus a small WebGL water shader with an SVG gradient fallback |
+| View | Camera behind Capi; the world streams toward the player | Side view; the scene scrolls right to left |
+| Steering | Move the finger or mouse **left and right**; ArrowLeft / ArrowRight | Move the finger or mouse **up and down**; ArrowUp / ArrowDown |
+| Dash | Quick tap, Space or ArrowUp | Quick tap, Space or ArrowRight |
+| Worlds | Rio: Copacabana (wave mosaic, palms, umbrellas, sea with moving waves, Sugarloaf, cable car). Porto: Ribeira quay (facades, bollards, Douro with rabelo boats, Dom Luís arch, tram). Party themes run at night | Themed SVG layers per city and theme, night variant for Party |
+| Capi | 3D model with five costume hats, run cycle, lean, squash, dash ghosts, stun blink, cheer | SVG character with the same costumes, lean and squash |
+| Fox hint | "left and right" | "up and down" |
+| Reduced motion | No lean, no dash ghosts, still water and sky | No shake, still water, ambient decoration stopped |
+| GL context loss | The game keeps running; drawing resumes when the context is restored (tested) | Water falls back to the SVG gradient (tested) |
+| Cost at 6x CPU throttle | About 10 % main thread, 6 DOM nodes (software GL on the test machine, so GPU cost is unmeasured) | About 37 % main thread, about 890 DOM nodes |
+
+Switching: add `?mode=2d` to the URL for the 2D runner with its WebGL water,
+or `?nowebgl=1` for the 2D runner with no WebGL at all. There is no in-game
+toggle; the mode is a URL choice so a review can compare both on the same
+device. The scripts follow the same switch through `MODE=2d`.
 
 ## Build and run
 
@@ -69,9 +95,9 @@ TypeScript source, scripts and docs, then prints the byte size and root
 listing and fails if `index.html` is not at the root or the ZIP exceeds
 5,000,000 bytes. The stage argument names the ZIP and the `RUN.txt` label;
 ZIPs of earlier stages in `release/` are left in place. The Stage 1 ZIP
-(`stage1-v1`) was 209,576 bytes; the Stage 3 ZIP built on 2026-10-29 is
-330,576 bytes and includes the plans, the model gallery page and the CI
-workflow under `source/`.
+(`stage1-v1`) was 209,576 bytes; the Stage 3 ZIP built on 2026-10-30 is
+293,718 bytes, with the single-file `index.html` at the root and the plans,
+the model gallery page and the CI workflow under `source/`.
 
 ### Scripts
 
@@ -94,9 +120,9 @@ workflow under `source/`.
 the SVG fallback runner (it appends `?mode=2d`); the default is the 3D runner.
 
 Add `?seed=N` to the URL for deterministic spawns (the tests use `seed=7`),
-`?perf=1` for the live performance overlay, `?mode=2d` for the SVG runner and
-`?nowebgl=1` to force the SVG runner with its gradient water (no WebGL at all). `window.passportQuest.debug` exposes read-only state for the
-scripts. The scripts use the Google Chrome found at the macOS path by default;
+`?perf=1` for the live performance overlay, and `?mode=2d` or `?nowebgl=1`
+to pick the 2D runner (see [Game modes](#game-modes-3d-and-2d)).
+`window.passportQuest.debug` exposes read-only state for the scripts. The scripts use the Google Chrome found at the macOS path by default;
 set `CHROME_PATH` to point them at another Chrome or Chromium binary.
 `NO_STORAGE=1 node scripts/e2e.mjs …` runs the flow with `localStorage`
 throwing on every access (sandboxed-iframe conditions).
@@ -162,7 +188,7 @@ tablet was used; the developer records real-device results separately.
 Run the same checks yourself:
 
 ```bash
-npm run check   # all gates against a static preview of dist/ (about 10 minutes: 3D at both sizes, then 2D once)
+npm run check   # all gates: 3D e2e at both sizes, 2D once, layout, e2e on dist/index.html as a file (about 12 minutes)
 
 # or individually, against the dev server:
 npm run dev &
