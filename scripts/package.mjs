@@ -36,15 +36,16 @@ cpSync(join(root, 'README.md'), join(stage, 'README.md'));
 // 3. Run instructions at the root.
 writeFileSync(join(stage, 'RUN.txt'), `Passport Quest — ${stageLabel} build
 
-RUN THE GAME (static server; file:// will not work because of ES modules):
-  python3 -m http.server 8080        # from this folder, then open http://localhost:8080/
+RUN THE GAME
+  Double-click index.html (it is self-contained: one file, no server needed), or serve this folder:
+  python3 -m http.server 8080        # then open http://localhost:8080/
   or: npx serve .
 
 Open it in a mobile viewport (e.g. Chrome DevTools device mode, 320x568 or 390x844) or on a phone on the same network.
 The run is a WebGL 3D world by default; add ?mode=2d to the URL for the SVG runner (also used automatically without WebGL).
 
 CONTENTS
-  index.html, assets/   production build (bundled JS, CSS, fonts; no external requests)
+  index.html            production build: JS, CSS and fonts inlined in one file; no external requests
   source/               readable TypeScript source, scripts, docs, configs
   README.md             build/run instructions, testing results, credits
 

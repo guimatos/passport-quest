@@ -65,7 +65,9 @@ Time per section and the recording tool are left for the developer to fill in.
 8. **Testing** (_time: …_)
    - Run `npm run check`: typecheck, build, bundle budget, e2e at both sizes
      in 3D plus once in 2D (`MODE=2d`) on a static preview of `dist/`, layout
-     checks, perf print; the same job is in `.github/workflows/check.yml`.
+     checks, the e2e once more with `dist/index.html` opened as a file, perf
+     print; the same job is in `.github/workflows/check.yml`. Double-click
+     `index.html` from the ZIP to show it runs without a server.
      Show the GL context-loss test and the seeded golden-item run in
      `scripts/e2e.mjs`, the emulated-vs-real table in the README and the ZIP
      size check from `npm run package`.

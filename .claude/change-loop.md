@@ -19,6 +19,7 @@ Contracts inside the repo (the "blast radius" of a change):
 - `window.passportQuest.debug` is read by every script: `entities[].x/y` mean scene x/y in 2D and lateral/distance-ahead in 3D; `toScreen(x, y)` is scene→viewport in 2D and the pointer point that steers to lateral `x` in 3D; `mode`, `gl`, `draws`, `world` and `feel.goldens` exist for the 3D checks. The shared steering lives in `scripts/autopilot.mjs`; `MODE=2d` switches every script to the SVG runner.
 - `src/game.ts` owns all mutable state and the single `reset()` path. Anything that adds a listener, timer, tween, DOM node or audio must be torn down there (AbortSignal, `Clock`, `Fx.clear`, `Music.stop`).
 - `scripts/e2e.mjs` is the executable spec of the flow. A flow change (new state, new screen, renamed button class) must update it in the same commit.
+- The build is one self-contained `dist/index.html` (`scripts/inline.mjs` after `vite build`): the bundle must stay a single chunk without `import`, `export` or `import.meta` (no dynamic imports, no code splitting), and the only runtime files are what that step inlines. `npm run check` runs the e2e once against `file://…/dist/index.html`.
 - Product-promise rules (binding): every balance, coupon and email action is labelled demo/mock; no real business names in coupons; the CTA never navigates; no network requests at runtime.
 
 Consumer search (run before renaming an id, class or state):
@@ -40,7 +41,7 @@ Code generation: none.
 - Commit message: imperative subject, optional body with the why; end with the `Co-Authored-By` line when an agent wrote the code
 - PR: optional; one PR per change targeting `main` on github.com/guimatos/passport-quest. Never push or tag unasked
 - Keeping current: n/a (single author)
-- QA / staging: none. "Ship to QA" means: `npm run build`, serve `dist/` statically and run `node scripts/e2e.mjs http://localhost:4173/ 320 568`
+- QA / staging: none. "Ship to QA" means: `npm run build`, serve `dist/` statically and run `node scripts/e2e.mjs http://localhost:4173/ 320 568`, plus once against `file://$PWD/dist/index.html`
 - Release: `npm run package -- stageN` → `release/passport-quest-stageN.zip` (earlier stages' ZIPs are kept; `release/` is git-ignored); tag the delivered commit (`stage1-v1`, `stage2-v1`, `stage3-v1`…). Never move an existing tag.
 - Never:
   - Add a runtime network request, CDN, analytics or font link: the brief forbids external requests.

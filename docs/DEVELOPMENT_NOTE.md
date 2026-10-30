@@ -6,16 +6,18 @@
 |---|---|---|
 | Vite 7 | bundling, dev server | no (output only) |
 | TypeScript 5 (`strict`) | source language, type gate | no |
-| `@fontsource/fredoka` | Fredoka font files (OFL 1.1), latin 500/700 | yes (woff2/woff, ~72 KB) |
+| `@fontsource/fredoka` | Fredoka font files (OFL 1.1), latin 500/700 | yes (woff2 only, inlined as data URIs, ~43 KB) |
 | `puppeteer-core` | headless-Chrome test scripts, uses the installed Google Chrome | no (dev-only) |
 | Python 3 `http.server` | static-server test of `dist/` | no |
 | Web Audio API | procedural background music | browser API |
 | WebGL 1 | 3D runner (`src/gl/*`, `src/scene3d/*`, Stage 3) and the water shader of the 2D runner (`src/scene/water.ts`); SVG runner as fallback | browser API |
 | Canvas 2D | pooled particles (`src/fx/particles.ts`) | browser API |
 
-No game framework and no runtime npm dependency. Runtime assets are the bundled
-JS, CSS and the four font files; there are no images, audio files or external
-URLs. The production build is about 280 KB on disk since Stage 3 (`npm run check` enforces a 300,000-byte budget); the whole 3D stack is about 40 KB minified.
+No game framework and no runtime npm dependency. The production build is one
+self-contained `index.html` (JS, CSS and the two woff2 fonts inlined by
+`scripts/inline.mjs` after `vite build`); there are no images, audio files or
+external URLs. It is about 250 KB on disk since Stage 3 (`npm run check`
+enforces a 300,000-byte budget); the whole 3D stack is about 40 KB minified.
 
 ## Assets
 
@@ -313,9 +315,20 @@ but it has not been measured on one.
    the far-distance flicker.
 5. **Culled discs.** The sun, moon and stars are one-sided discs; a rotation
    of +90° about x makes them face the camera, −90° culls them silently.
-6. **Bundle budget.** The 3D stack added about 40 KB; the build is 280 KB
-   of 300,000 bytes. The two `.woff` files (40 KB) could go if the budget
-   ever binds, since every target browser reads `.woff2`.
+6. **Bundle budget.** The 3D stack added about 40 KB; the build was 280 KB
+   of 300,000 bytes with four font files, and 250 KB once the single-file
+   step dropped the `.woff` copies (every target browser reads `.woff2`).
+7. **Double-clicking `index.html` did nothing.** Vite emits a module script
+   with `crossorigin`, and on a `file://` page (origin "null") Chrome blocks
+   both the script and the stylesheet as cross-origin requests. The brief
+   only requires a static HTTP server, but a reviewer who opens the file
+   should not see a blank page. `scripts/inline.mjs` now folds the build
+   into one HTML file: the bundle (a single ES2019 chunk with no `import`,
+   `export` or `import.meta`) is inlined as a classic script inside a
+   strict-mode function at the end of `<body>`, `</script` and `<!--`
+   sequences are escaped, and the CSS is inlined with the woff2 fonts as
+   data URIs. `npm run check` runs the e2e once against the file URL; the
+   only "requests" are the two data-URI fonts.
 
 ## Known limitations and unfinished work
 

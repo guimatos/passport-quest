@@ -1,11 +1,13 @@
 // Runs every gate in order: typecheck, build, bundle budget, static preview server, e2e at two sizes (3D) and once in 2D,
+// e2e once with index.html opened as a file (no server),
 // layout checks, perf measurement (printed, never fails the run). Exits non-zero on the first red step.
 // Usage: npm run check   (CHROME_PATH=/path/to/chrome overrides the browser used by the scripts)
 import { spawn, spawnSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const BUDGET = 300_000; // bytes on disk for dist/, fonts included
+const BUDGET = 300_000; // bytes on disk for dist/ (one self-contained index.html, fonts inlined)
 const PORT = 4173;
 const url = `http://localhost:${PORT}/`;
 
@@ -17,6 +19,7 @@ const run = (cmd, args, env = {}) => {
 
 run('npx', ['tsc', '--noEmit']);
 run('npx', ['vite', 'build']);
+run('node', ['scripts/inline.mjs']); // same post-build step as npm run build: one self-contained dist/index.html
 
 const size = (d) => readdirSync(d).reduce((n, f) => { const p = join(d, f); return n + (statSync(p).isDirectory() ? size(p) : statSync(p).size); }, 0);
 const total = size('dist');
@@ -37,6 +40,7 @@ try {
   run('node', ['scripts/e2e.mjs', url, '390', '844']);
   run('node', ['scripts/e2e.mjs', url, '320', '568'], { MODE: '2d' }); // the SVG fallback runner
   run('node', ['scripts/layoutcheck.mjs', url]);
+  run('node', ['scripts/e2e.mjs', pathToFileURL(resolve('dist/index.html')).href, '320', '568']); // double-clicked index.html, no server
   console.log('\n$ node scripts/perfcheck.mjs (informational)');
   spawnSync('node', ['scripts/perfcheck.mjs', url, '8'], { stdio: 'inherit' });
   console.log('\nALL GATES GREEN');

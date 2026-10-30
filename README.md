@@ -39,14 +39,20 @@ npm install
 npm run dev        # http://localhost:5173/  (Vite dev server)
 ```
 
-Production build and static-server test (ES modules need an HTTP server;
-`file://` will not work):
+Production build:
 
 ```bash
-npm run build                      # writes dist/
-npm run serve:dist                 # python3 -m http.server 4173 --directory dist
-# or: npx serve dist
+npm run build                      # writes dist/index.html (one self-contained file)
+open dist/index.html               # double-click works: no server needed
+npm run serve:dist                 # or python3 -m http.server 4173 --directory dist
 ```
+
+The build is a single `index.html` with the JavaScript, the stylesheet and
+the woff2 fonts inlined (`scripts/inline.mjs` runs after `vite build`), so it
+runs both from a static HTTP server, as the brief requires, and when the file
+is opened directly from disk. A module script with `crossorigin` would be
+blocked by the browser on a `file://` origin, which is why the page loads its
+code as a classic script instead.
 
 Open the URL in a mobile viewport (Chrome DevTools device mode, 320×568 or
 390×844) or on a phone on the same network.
@@ -57,7 +63,7 @@ Open the URL in a mobile viewport (Chrome DevTools device mode, 320×568 or
 npm run package -- stage3   # build + release/passport-quest-stage3.zip (default stage: stage3)
 ```
 
-The script puts the runnable build at the ZIP root (`index.html`, `assets/`),
+The script puts the runnable build at the ZIP root (a single `index.html`),
 adds `RUN.txt`, this README and a `source/` folder with the readable
 TypeScript source, scripts and docs, then prints the byte size and root
 listing and fails if `index.html` is not at the root or the ZIP exceeds
@@ -72,11 +78,11 @@ workflow under `source/`.
 | Command | What it does |
 |---|---|
 | `npm run dev` | Vite dev server on 5173 |
-| `npm run build` | `tsc --noEmit` then `vite build` → `dist/` |
+| `npm run build` | `tsc --noEmit`, `vite build`, then `scripts/inline.mjs` folds the output into one `dist/index.html` |
 | `npm run preview` | Vite preview of `dist/` |
 | `npm run serve:dist` | Python static server for `dist/` on 4173 |
 | `npm run package` | Build and create the delivery ZIP with verification |
-| `npm run check` | Every gate in one run: typecheck, build, bundle budget (≤ 300,000 bytes), e2e at both sizes in 3D plus once in 2D against a static preview of `dist/`, layout checks, perf print |
+| `npm run check` | Every gate in one run: typecheck, build, bundle budget (≤ 300,000 bytes), e2e at both sizes in 3D plus once in 2D against a static preview of `dist/`, layout checks, e2e once with `dist/index.html` opened as a file, perf print |
 | `npm run perf` | `scripts/perfcheck.mjs`: fps, frame times, main-thread cost and heap at 6x CPU throttle in the busiest scene (prints JSON) |
 | `node scripts/e2e.mjs <url> <w> <h>` | Headless-Chrome flow test (uses the installed Google Chrome via `puppeteer-core`, dev-only) |
 | `node scripts/layoutcheck.mjs <url>` | Rotate prompt, desktop frame and mid-game resize checks |
@@ -147,6 +153,7 @@ tablet was used; the developer records real-device results separately.
 | No scrolling/zoom: `touch-action: none`, `overscroll-behavior: none`, no document overflow | pass (overflow asserted) | emulated |
 | No console errors, no broken assets, no external requests (5 local requests) | pass | emulated, Network observed |
 | Static-server execution of `dist/` (Python http.server) at both sizes | pass | emulated |
+| `index.html` opened directly from disk (`file://`, no server): full flow, no requests beyond the file itself | pass | emulated 320×568 |
 | ZIP root structure and byte size | pass | script |
 | 3D look and frame rate on a phone GPU | **not verified** (headless Chrome renders GL in software) | — |
 | Music audible and balanced | **not verified** (headless has no audio output) | — |
@@ -222,7 +229,7 @@ src/lib/storage.ts      guarded localStorage for mute and best score (no network
 src/audio/music.ts      procedural music (Web Audio), mute, hidden handling
 src/lib/*.ts            game clock (timers/tweens), rAF loop with pause reasons, DOM helpers, seeded RNG
 src/styles.css          all styling and CSS animations
-scripts/                check (all gates), package, e2e, layoutcheck, perfcheck, playshot, artcheck, artcheck3d, autopilot (shared steering, MODE=2d)
+scripts/                check (all gates), inline (single-file post-build), package, e2e, layoutcheck, perfcheck, playshot, artcheck, artcheck3d, autopilot (shared steering, MODE=2d)
 .github/workflows/      check.yml: the same gates on every push once a remote exists
 docs/                   development note, walkthrough outline
 .claude/change-loop.md  change-loop profile for /plan-change and /implement-change

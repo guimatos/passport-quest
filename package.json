@@ -6,7 +6,7 @@
   "description": "Passport Quest — a Scrambly-styled playable (Simula take-home)",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/inline.mjs",
     "preview": "vite preview",
     "serve:dist": "python3 -m http.server 4173 --directory dist",
     "package": "npm run build && node scripts/package.mjs",

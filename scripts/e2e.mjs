@@ -30,6 +30,8 @@ const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots
 const state = () => page.$eval('#app', (el) => el.dataset.state);
 const dbg = () => page.evaluate(() => { const d = window.passportQuest.debug; return { state: d.state, points: d.points, progress: d.progress, fox: d.fox, n: d.entities.length, chosen: d.chosen, coupons: d.coupons, entities: d.entities }; });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// A file:// page has origin "null"; its own requests start with file:. Anything else is external.
+const isLocal = (u) => u.startsWith('data:') || (u.startsWith('file:') ? url.startsWith('file:') : u.startsWith(new URL(url).origin));
 const check = (cond, msg) => { if (!cond) throw new Error('CHECK FAILED: ' + msg); console.log('ok  ', msg); };
 const hintVisible = () => page.$eval('.hint-hand', (e) => e.getAttribute('visibility') === 'visible');
 const feel = () => page.evaluate(() => window.passportQuest.debug.feel);
@@ -203,7 +205,7 @@ await page.type('.email-input', 'test@example.com');
 await page.tap('.btn--send'); await sleep(150);
 check((await page.$eval('.email-confirm', (e) => e.textContent)).includes('test@example.com'), 'mock send confirmation shown');
 check(logs.some((l) => l.includes('mock') && l.includes('coupons')), 'mock send logged, nothing sent');
-check(requests.filter((u) => !u.startsWith(new URL(url).origin)).length === 0, 'no network request from the email mock');
+check(requests.filter((u) => !isLocal(u)).length === 0, 'no network request from the email mock');
 await shot('07b-email');
 // Restart from final
 await page.tap('.btn--restart-final');
@@ -292,7 +294,7 @@ if (MODE === '3d') {
 
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight);
 check(!overflow, 'no document overflow');
-const external = requests.filter((u) => !u.startsWith(new URL(url).origin));
+const external = requests.filter((u) => !isLocal(u));
 check(external.length === 0, `no external requests (${requests.length} local requests)`);
 check(errors.length === 0, `no console/page errors (${errors.length})`);
 if (errors.length) console.log(errors);
