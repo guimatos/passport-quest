@@ -550,6 +550,8 @@ export class Game {
       dodges: this.dodges,
       hits: this.hits,
       best: this.best,
+      time: this.clock.time, // game-clock ms, for the scripts' diagnostics
+      paused: this.loop.paused,
     };
   }
 }

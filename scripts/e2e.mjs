@@ -49,15 +49,16 @@ const continueTo = async (expected) => {
   const rect = () => page.$eval('.btn--continue', (e) => { const r = e.getBoundingClientRect(); return `${r.x.toFixed(1)},${r.y.toFixed(1)},${getComputedStyle(e).opacity}`; });
   let last = await rect();
   await until(async () => { await sleep(100); const now = await rect(); const same = now === last; last = now; return same; }, 4000);
+  const before = await page.evaluate(() => { const b = document.querySelector('.btn--continue'); window.__contClicks = 0; b.addEventListener('click', () => { window.__contClicks++; }, { once: true }); return { time: window.passportQuest.debug.time, paused: window.passportQuest.debug.paused }; });
   await page.tap('.btn--continue');
   if ((await until(async () => (await state()) === expected, 4000)) === null) {
     // Diagnostics for a miss (seen only on the CI runner): what is under the button and what the game thinks.
     const diag = await page.evaluate(() => {
       const d = window.passportQuest.debug; const b = document.querySelector('.btn--continue'); const r = b?.getBoundingClientRect();
       const under = r ? document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) : null;
-      return { state: d.state, wiping: d.wiping, rect: r && [r.x, r.y, r.width, r.height].map(Math.round), under: under && (under.tagName + '.' + under.className), visible: b && getComputedStyle(b).visibility, viewport: [innerWidth, innerHeight] };
+      return { state: d.state, wiping: d.wiping, clicks: window.__contClicks, time: d.time, paused: d.paused, hitStop: d.hitStop, rect: r && [r.x, r.y, r.width, r.height].map(Math.round), under: under && (under.tagName + '.' + under.className), visible: b && getComputedStyle(b).visibility, viewport: [innerWidth, innerHeight] };
     });
-    console.log('continueTo diagnostics:', JSON.stringify(diag), '| last logs:', logs.slice(-4).join(' || '));
+    console.log('continueTo diagnostics:', JSON.stringify({ before, ...diag }), '| last logs:', logs.slice(-4).join(' || '));
     check(false, `continue enters ${expected}`);
   }
 };
